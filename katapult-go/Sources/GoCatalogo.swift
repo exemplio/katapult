@@ -158,7 +158,10 @@ struct ElementoView: View {
         AsyncImage(url: URL(string: imagen.url)) { fase in
             switch fase {
             case .success(let img):
-                img.resizable().scaledToFill()
+                // Dentro de un overlay la imagen NO participa en el layout:
+                // scaledToFill a pelo declara su tamaño natural (enorme) y
+                // ensancha la Fila más que la pantalla — todo sale recortado.
+                Color.clear.overlay(img.resizable().scaledToFill())
             case .failure:
                 Image(systemName: "photo").foregroundStyle(.secondary)
             default:

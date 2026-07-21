@@ -62,7 +62,11 @@ fun main(args: Array<String>) {
 
     println("→ Módulos Zipline en http://0.0.0.0:$puerto (dir: $dir)")
 
-    anunciarServicio(modo = "go", puerto = puerto, extras = mapOf("path" to "/manifest.zipline.json"))
+    // Cerrar el anuncio al morir manda los paquetes de despedida de mDNS. Sin
+    // esto, el registro queda cacheado en la red hasta que expira su TTL y el
+    // siguiente servidor aparece renombrado como "... (2)" en el iPhone.
+    val anuncio = anunciarServicio(modo = "go", puerto = puerto, extras = mapOf("path" to "/manifest.zipline.json"))
+    anuncio?.let { Runtime.getRuntime().addShutdownHook(Thread { it.close() }) }
     ipLan()?.let { ip ->
         val url = "http://${ip.hostAddress}:$puerto/manifest.zipline.json"
         println("→ En el iPhone: elige el servidor en Katapult Go, o escanea:")

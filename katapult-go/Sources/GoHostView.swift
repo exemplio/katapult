@@ -40,33 +40,39 @@ struct GoHostView: View {
                 }
                 .padding()
             } else {
-                VStack(alignment: .leading, spacing: 0) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text(titulo)
-                                .font(.title2.bold())
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(titulo)
+                            .font(.title2.bold())
 
-                            // El catálogo v2: la lógica manda QUÉ mostrar como
-                            // árbol de GoElemento; ElementoView (GoCatalogo.swift)
-                            // lo pinta recursivamente con SwiftUI nativo.
-                            ForEach(Array(elementos.enumerated()), id: \.offset) { _, elemento in
-                                ElementoView(
-                                    elemento: elemento,
-                                    enviar: { id, valor in anfitrion.evento(id: id, valor: valor) },
-                                    borradores: $borradores
-                                )
-                            }
+                        // El catálogo v2: la lógica manda QUÉ mostrar como
+                        // árbol de GoElemento; ElementoView (GoCatalogo.swift)
+                        // lo pinta recursivamente con SwiftUI nativo.
+                        ForEach(Array(elementos.enumerated()), id: \.offset) { _, elemento in
+                            ElementoView(
+                                elemento: elemento,
+                                enviar: { id, valor in anfitrion.evento(id: id, valor: valor) },
+                                borradores: $borradores
+                            )
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
                     }
-
-                    // El contador de versión es la prueba visible de la recarga:
-                    // sube cada vez que llega código nuevo por la red.
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                }
+                // El contador de versión es la prueba visible de la recarga:
+                // sube cada vez que llega código nuevo por la red. Como inset
+                // del área segura no se solapa nunca con el contenido, y con
+                // fondo .bar se lee sobre cualquier cosa.
+                .safeAreaInset(edge: .bottom) {
                     Text("lógica v\(version) · \(manifestURL.absoluteString)")
                         .font(.caption2.monospaced())
                         .foregroundStyle(.secondary)
-                        .padding([.horizontal, .bottom])
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal)
+                        .padding(.vertical, 6)
+                        .background(.bar)
                 }
             }
         }

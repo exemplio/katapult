@@ -38,7 +38,11 @@ fun startMirror(
     ).start()
 
     // Descubrible desde katapult-go sin teclear la IP, como en Expo Go.
-    anunciarServicio(modo = "espejo", puerto = port)
+    // Cerrarlo al morir manda la despedida de mDNS; si no, el registro queda
+    // cacheado en la red hasta expirar su TTL y el siguiente servidor sale
+    // renombrado como "... (2)" en el iPhone.
+    val anuncio = anunciarServicio(modo = "espejo", puerto = port)
+    anuncio?.let { Runtime.getRuntime().addShutdownHook(Thread { it.close() }) }
     ipLan()?.let { ip ->
         val url = "http://${ip.hostAddress}:$port"
         println("→ En el iPhone: elige el servidor en Katapult Go, o escanea:")
