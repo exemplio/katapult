@@ -22,7 +22,9 @@ class MirrorPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         val ext = project.extensions.create("katapultMirror", MirrorExtension::class.java).apply {
             port.convention(8080)
-            fps.convention(20)
+            // El render cuesta ~3 ms y la codificación va en su propio hilo, así
+            // que 60 es sostenible. El techo lo pone el JPEG (~14 ms → ~64 fps).
+            fps.convention(60)
             widthDp.convention(390)
             heightDp.convention(844)
             density.convention(2f)

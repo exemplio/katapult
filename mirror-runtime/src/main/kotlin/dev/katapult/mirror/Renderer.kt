@@ -10,7 +10,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
+import org.jetbrains.skia.Image
+import org.jetbrains.skia.ImageInfo
 
 /**
  * LifecycleOwner mínimo para la escena.
@@ -81,13 +84,55 @@ class Renderer(
     // el estado cambie — se ve la pantalla inicial para siempre.
     private val startNanos = System.nanoTime()
 
-    /** Rasteriza el estado actual y lo codifica. */
-    fun frame(format: EncodedImageFormat = EncodedImageFormat.JPEG, quality: Int = 80): ByteArray {
-        val image = scene.render(System.nanoTime() - startNanos)
-        val data = image.encodeToData(format, quality)
-            ?: error("Skia no pudo codificar el frame")
-        return data.bytes
+    /** Coste del último snapshot, en nanosegundos. Para diagnosticar el cuello. */
+    var lastRenderNanos = 0L
+        private set
+    var lastCopyNanos = 0L
+        private set
+
+    /**
+     * Rasteriza el estado actual y copia los píxeles a un bitmap propio.
+     *
+     * Debe llamarse en el EDT, como todo lo que toca la escena. La copia existe
+     * para poder codificar en OTRO hilo: la imagen que devuelve `render` apunta
+     * a la superficie de la escena, que el frame siguiente sobrescribe.
+     *
+     * Medido: rasterizar ~2,5 ms, copiar ~1 ms. Codificar, en cambio, cuesta
+     * ~15 ms — por eso se hace fuera de aquí.
+     */
+    fun snapshot(): Bitmap {
+        val t0 = System.nanoTime()
+        val image = scene.render(t0 - startNanos)
+        val t1 = System.nanoTime()
+
+        val bitmap = Bitmap()
+        bitmap.allocPixels(ImageInfo.makeN32Premul(widthPx, heightPx))
+        if (!image.readPixels(bitmap)) error("Skia no pudo leer los píxeles del frame")
+        bitmap.setImmutable()   // requisito para makeFromBitmap sin copia extra
+
+        lastRenderNanos = t1 - t0
+        lastCopyNanos = System.nanoTime() - t1
+        return bitmap
     }
 
     fun close() = scene.close()
+
+    companion object {
+        /**
+         * Codifica un snapshot. Es la parte cara, así que va fuera del EDT.
+         * Consume el bitmap: lo libera al terminar.
+         */
+        fun encode(
+            bitmap: Bitmap,
+            format: EncodedImageFormat = EncodedImageFormat.JPEG,
+            quality: Int = DEFAULT_QUALITY,
+        ): ByteArray = try {
+            Image.makeFromBitmap(bitmap).use { image ->
+                (image.encodeToData(format, quality)
+                    ?: error("Skia no pudo codificar el frame")).use { it.bytes }
+            }
+        } finally {
+            bitmap.close()
+        }
+    }
 }

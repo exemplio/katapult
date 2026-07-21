@@ -57,6 +57,9 @@ class Build : CliktCommand(
             fail("El build falló. Logs: gh run view $id --log-failed")
 
         val outDir = File("build/katapult").apply { mkdirs() }
+        // gh run download aborta si el archivo ya existe, así que retiramos el
+        // IPA sin firmar del build anterior. El firmado no se toca.
+        outDir.listFiles()?.filter { it.name.endsWith("-unsigned.ipa") }?.forEach { it.delete() }
         echo("→ Descargando artifact '${cfg.artifactName}'…")
         if (run("gh", "run", "download", id, "--name", cfg.artifactName, "--dir", outDir.path) != 0)
             fail("No se pudo descargar el artifact.")

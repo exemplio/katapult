@@ -42,7 +42,14 @@ fun startMirror(
 }
 
 const val DEFAULT_PORT = 8080
-const val DEFAULT_FPS = 20
+
+// El render cuesta ~3,5 ms y la codificación va en otro hilo, así que 60 es
+// alcanzable. El techo real lo pone el codificador JPEG (~15 ms → ~64 fps).
+const val DEFAULT_FPS = 60
+
 const val DEFAULT_WIDTH_DP = 390    // iPhone 14
 const val DEFAULT_HEIGHT_DP = 844
 const val DEFAULT_DENSITY = 2f
+
+/** Calidad JPEG. Domina tanto el tamaño del frame como el coste de codificar. */
+const val DEFAULT_QUALITY = 70
