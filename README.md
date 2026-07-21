@@ -2,12 +2,16 @@
 
 **Desarrolla apps Kotlin Multiplatform con Compose para iOS desde Linux, sin un Mac.**
 
-Katapult son dos herramientas que resuelven problemas distintos:
+Katapult son tres herramientas que resuelven problemas distintos:
 
 - **El pipeline** — GitHub Actions (runner macOS de *tu* cuenta) compila el IPA
   sin firmar, `zsign` lo firma en local, y se instala por USB.
 - **El espejo** — tu UI de Compose se renderiza en la JVM y se transmite al
   iPhone por WiFi a 60 fps, para iterar sin recompilar nada nativo.
+- **Katapult Go** — tu lógica Kotlin viaja por la red como bytecode
+  ([Zipline](https://github.com/cashapp/zipline)) y corre *en* el iPhone con
+  recarga en caliente; la UI se describe como datos sobre un catálogo de
+  piezas nativas de SwiftUI.
 
 ```bash
 katapult init        # genera katapult.json + workflow de Actions en tu repo KMP
@@ -61,6 +65,38 @@ animaciones sube.)*
 llega al iPhone son píxeles renderizados en tu PC. Para medir rendimiento real,
 compila el IPA nativo.
 
+## Katapult Go: lógica que viaja
+
+El otro modo de la app **Katapult Go** (la misma que muestra el espejo). Tu
+lógica de Kotlin se compila a bytecode de QuickJS, viaja por WiFi y se ejecuta
+*en el dispositivo*; al guardar un archivo, el iPhone recarga solo, sin IPA de
+por medio. La pantalla se declara como un árbol de datos (`GoElemento`, 14
+piezas: textos, botones, campos, imágenes, contenedores anidables, un `Lienzo`
+de órdenes de dibujo para gráficos custom…) que la app pinta con SwiftUI
+nativo — sin WebView.
+
+Se activa con dos líneas en un módulo de tu proyecto KMP:
+
+```kotlin
+plugins { id("dev.katapult.go") version "0.1.0" }
+
+katapultGo {
+    logica = "com.tuapp.golog.MiLogica"   // tu implementación de GoLogica
+}
+```
+
+```bash
+./gradlew :tu-modulo:goDev
+# sirve en :8081, se anuncia por mDNS (la app lo lista en "En tu red", como
+# Expo Go), imprime un QR con deep link katapult:// y recompila al guardar
+```
+
+Los límites son deliberados: el catálogo es fijo (Apple prohíbe descargar
+código nativo, así que las piezas nuevas requieren IPA), y no hay `Modifier`
+arbitrario ni animaciones libres — para eso está el espejo, que ejecuta
+Compose de verdad. Diseño y criterio de crecimiento en
+[docs/CATALOGO_GO_PROPUESTA.md](docs/CATALOGO_GO_PROPUESTA.md).
+
 ## Requisitos
 
 - JDK 17+
@@ -84,15 +120,19 @@ compila el IPA nativo.
 - [x] **CLI de builds** — init/build/sign/install/doctor/setup/publish
 - [x] **Espejo de desarrollo** — Compose en JVM, H.264 + WebCodecs, 60 fps,
       toques y gestos de vuelta
-- [x] **Lógica dinámica, paso 0 (JVM)** — código Kotlin que se descarga y
-      recarga en caliente con [Zipline](https://github.com/cashapp/zipline);
-      ver [docs/KATAPULT_GO_PASO_0.md](docs/KATAPULT_GO_PASO_0.md)
-- [ ] **Katapult Go** — ya tiene dos modos de conexión: **Espejo** (WKWebView
-      del cliente web; decodificar nativo con VideoToolbox sigue pendiente) y
-      **Go** (anfitrión Zipline vía `GoRuntime.framework`: la lógica corre en
-      el dispositivo y se recarga en caliente). Falta compilar el IPA en CI
-      y probarlo en un iPhone real
-- [ ] Publicar el plugin en el portal de Gradle (ahora se resuelve por `mavenLocal`)
+- [x] **Katapult Go** — probado en iPhone real, con sus dos modos: **Espejo**
+      (cliente web en WKWebView) y **Go** (anfitrión Zipline vía
+      `GoRuntime.framework`: lógica en el dispositivo, recarga en caliente,
+      catálogo de 14 piezas con `Lienzo` incluido). Descubrimiento de
+      servidores por mDNS + QR con deep links `katapult://`.
+      Cronología: [docs/KATAPULT_GO_PASO_0.md](docs/KATAPULT_GO_PASO_0.md)
+- [ ] **Servicios de anfitrión** para la lógica Go — QuickJS no tiene red;
+      hasta que el anfitrión le preste `fetch`, la lógica no puede llamar a
+      una API real
+- [ ] Decodificación nativa del espejo en la app (VideoToolbox) — hoy el modo
+      espejo es un WKWebView del cliente web
+- [ ] Publicar los plugins en el portal de Gradle (ahora se resuelven por
+      `mavenLocal`)
 
 ## Lo que Katapult no va a ser
 
@@ -106,15 +146,18 @@ llegó a producción, y **discontinuaron Redwood en enero de 2026**. El análisi
 completo, con las alternativas y sus costes, está en
 [docs/OPCION_D_EXPO_GO_PARA_COMPOSE.md](docs/OPCION_D_EXPO_GO_PARA_COMPOSE.md).
 
-Lo que sí se está haciendo, **poco a poco y sin comprometer lo anterior**, es
-la parte de esa arquitectura que Expo Go también tiene: lógica interpretada que
-viaja, UI fija que no. El paso 0 ya funciona en JVM
-([docs/KATAPULT_GO_PASO_0.md](docs/KATAPULT_GO_PASO_0.md)).
+Lo que sí se hizo, **poco a poco y sin comprometer lo anterior**, es la parte
+de esa arquitectura que Apple sí permite: lógica interpretada que viaja
+(Zipline) más una UI descrita como **datos** sobre un catálogo nativo pequeño
+— pocas piezas que combinan (contenedores anidables, `Tocable`, `Lienzo`), no
+una transcripción de Material widget a widget, que es la trampa en la que
+murió Redwood. Eso es el modo Go de arriba.
 
-Mientras tanto, el reparto del día a día:
+El reparto del día a día:
 
 | | Para qué | Ciclo |
 |---|---|---|
 | Android / desktop | iterar lógica y UI | segundos |
-| Espejo | ver la UI en el iPhone real | instantáneo |
+| Espejo | ver la UI de Compose en el iPhone real | instantáneo |
+| Katapult Go | lógica real corriendo *en* el iPhone, UI sobre el catálogo | recarga en caliente |
 | IPA nativo | verificar rendimiento y APIs de plataforma | ~5 min |

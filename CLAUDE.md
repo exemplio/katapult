@@ -204,7 +204,6 @@ No son hipotéticas: todas se manifestaron y se arreglaron aquí.
 - **Adaptar la resolución al dispositivo**: el espejo renderiza fijo a 390x844
   @2x, pero el iPhone del usuario es 430x932 @3x — se está escalando y se ve
   menos nítido de lo que podría. El cliente debería informar su tamaño.
-- **Actualizar el README**, cuyo roadmap (Fase 3 con Zipline) quedó desmentido.
 - Reservar la organización `katapult-dev` en GitHub.
 
 ## Estrategia acordada
