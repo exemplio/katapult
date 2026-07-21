@@ -14,6 +14,9 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      # Icono: un solo PNG de 1024 (modo single-size de Xcode 14+); iOS genera
+      # los tamaños y redondea las esquinas.
+      - path: Assets.xcassets
     dependencies:
       # Framework Kotlin con el anfitrión Zipline (modo Go). Lo produce
       # `./gradlew :go-runtime:linkReleaseFrameworkIosArm64` ANTES de xcodegen
@@ -32,6 +35,7 @@ targets:
         CODE_SIGNING_ALLOWED: NO
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGN_IDENTITY: ""
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: Info.plist
       properties:
