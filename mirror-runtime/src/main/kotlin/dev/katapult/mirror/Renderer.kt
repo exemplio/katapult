@@ -2,9 +2,14 @@ package dev.katapult.mirror
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.ui.scene.ComposeScenePointer
 import androidx.compose.ui.unit.Density
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -73,9 +78,34 @@ class Renderer(
     /**
      * Inyecta un evento de puntero en la escena. Debe llamarse en el mismo hilo
      * que construyó la escena (el EDT).
+     *
+     * Se declara el puntero explícitamente, en vez de usar la variante corta, por
+     * dos motivos que rompen el scroll:
+     *
+     *  · La variante corta asume `PointerType.Mouse`, y para Compose un
+     *    movimiento de ratón sin botón pulsado es *hover*, no arrastre. Los
+     *    gestos de scroll nunca llegaban a dispararse.
+     *  · `pressed` tiene que seguir siendo true entre el press y el release; es
+     *    lo que convierte una secuencia de puntos en un arrastre.
+     *
+     * `timeMillis` importa igual: el detector de velocidad de Compose lo usa
+     * para calcular el impulso del scroll. Sin tiempos que avancen no hay
+     * inercia al soltar.
      */
-    fun sendPointer(type: PointerEventType, position: Offset) {
-        scene.sendPointerEvent(eventType = type, position = position)
+    @OptIn(InternalComposeUiApi::class, ExperimentalComposeUiApi::class)
+    fun sendPointer(type: PointerEventType, position: Offset, pressed: Boolean, timeMillis: Long) {
+        scene.sendPointerEvent(
+            eventType = type,
+            pointers = listOf(
+                ComposeScenePointer(
+                    id = PointerId(TOUCH_POINTER_ID),
+                    position = position,
+                    pressed = pressed,
+                    type = PointerType.Touch,
+                )
+            ),
+            timeMillis = timeMillis,
+        )
     }
 
     // Origen del reloj de frames. render(nanoTime) mueve TODO lo que depende de
@@ -118,6 +148,9 @@ class Renderer(
     fun close() = scene.close()
 
     companion object {
+        /** Un solo dedo: el cliente web manda un único punto de contacto. */
+        private const val TOUCH_POINTER_ID = 1L
+
         /**
          * Codifica un snapshot. Es la parte cara, así que va fuera del EDT.
          * Consume el bitmap: lo libera al terminar.
