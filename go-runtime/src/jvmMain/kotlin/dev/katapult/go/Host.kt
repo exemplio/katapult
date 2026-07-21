@@ -16,7 +16,8 @@ import okhttp3.OkHttpClient
 // 8081: el 8080 es del espejo. Ver el configureEach de ZiplineServeTask en el build.
 private const val MANIFEST_URL = "http://localhost:8081/manifest.zipline.json"
 
-fun main() {
+fun main(args: Array<String>) {
+    val manifestUrl = args.firstOrNull() ?: MANIFEST_URL
     // QuickJS no es thread-safe: todo Zipline vive en un único hilo.
     val executor = Executors.newSingleThreadExecutor { Thread(it, "zipline") }
     val dispatcher = executor.asCoroutineDispatcher()
@@ -29,10 +30,10 @@ fun main() {
             httpClient = OkHttpClient(),
         )
 
-        println("Esperando lógica en $MANIFEST_URL …")
+        println("Esperando lógica en $manifestUrl …")
         println("(arranca `./gradlew :go-runtime:serveDevelopmentZipline --continuous` en otra terminal)\n")
 
-        arrancarGo(this, dispatcher, loader, MANIFEST_URL) { estado ->
+        arrancarGo(this, dispatcher, loader, manifestUrl) { estado ->
             when (estado) {
                 is GoEstado.Esperando -> println("✗ sin lógica todavía: ${estado.detalle}")
                 is GoEstado.Corriendo -> render(estado.pantalla, estado.version)

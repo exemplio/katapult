@@ -32,8 +32,11 @@ ajenos. La firma es siempre local: el certificado no sale de la máquina.
 cli/              CLI con Clikt. Comandos: init, build, sign, install,
                   doctor, setup, publish, ota
 mirror-runtime/   Servidor del espejo: render Compose en JVM + H.264 + WebSocket
-gradle-plugin/    Cablea el espejo en un proyecto KMP (id "dev.katapult.mirror")
-                  El espejo y goServe se anuncian por mDNS (_katapult._tcp,
+gradle-plugin/    Dos plugins para proyectos KMP: "dev.katapult.mirror" (espejo)
+                  y "dev.katapult.go" (lógica dinámica: añade target js, aplica
+                  Zipline, genera el main @JsExport y registra goServe/goDev).
+                  Ejemplo real: módulo logica-go de katapult-demo.
+                  Los servidores se anuncian por mDNS (_katapult._tcp,
                   Anuncio.kt) e imprimen QR con deep links katapult://; la app
                   los descubre con NWBrowser (Descubridor.swift)
 go-runtime/       Fase 3: lógica dinámica con Zipline. commonMain = contrato,

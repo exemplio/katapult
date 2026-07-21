@@ -67,9 +67,11 @@ El puerto es **8081** (el 8080 es del espejo, para poder correr ambos a la vez).
 1. **`main()` de jsMain necesita `@JsExport`.** Kotlin/JS IR no exporta símbolos
    por defecto; sin la anotación QuickJS falla con
    `cannot read property 'katapult' of undefined` y no hay más pista que esa.
-2. **Zipline y Kotlin van emparejados.** Zipline 1.22.0 ↔ Kotlin 2.2.0 (el
-   CHANGELOG de Zipline documenta el mapeo). Subir Kotlin exige subir Zipline
-   a la vez, y viceversa.
+2. **Zipline y Kotlin van emparejados.** Par actual: Zipline 1.27.0 ↔ Kotlin
+   2.3.21 (el CHANGELOG de Zipline documenta el mapeo), alineado con
+   katapult-demo porque el plugin de compilador corre en el build del usuario.
+   Subir Kotlin exige subir Zipline a la vez, y viceversa — y cambiar el par
+   exige IPA nuevo (el bytecode debe casar con el loader del binario).
 3. **El freshness checker se llama `DefaultFreshnessCheckerNotFresh`**: nunca da
    por fresco el caché → siempre consulta la red. Es lo correcto en desarrollo.
 4. **QuickJS no es thread-safe**: todo Zipline vive en un único hilo
@@ -135,6 +137,41 @@ Katapult-go ya no exige teclear la IP; hay tres caminos, de más a menos cómodo
 Trampas de iOS ya contempladas: `NSBonjourServices` en Info.plist es
 obligatorio (sin él, el descubrimiento falla EN SILENCIO) y ya estaba
 `NSLocalNetworkUsageDescription` del espejo.
+
+## Tu propio proyecto: el plugin `dev.katapult.go`
+
+Desde julio de 2026 el modo Go ya no es solo la demo de este repo: cualquier
+proyecto KMP puede compilar SU lógica. En katapult-demo quedó el ejemplo — un
+módulo `logica-go` con:
+
+```kotlin
+plugins {
+    alias(libs.plugins.kotlinMultiplatform)
+    id("dev.katapult.go") version "0.1.0"
+}
+
+katapultGo {
+    logica = "com.jetbrains.kmpapp.golog.LogicaMuseo"  // implementa GoLogica
+}
+```
+
+El plugin (gemelo del de espejo) añade el target js, aplica Zipline, fija el
+`mainFunction`, genera el `main()` con `@JsExport` (la trampa queda enterrada
+en código generado) y registra `goServe`/`goDev`. El flujo del usuario:
+
+```bash
+./gradlew :logica-go:goDev     # y katapult-go lo lista en "En tu red"
+```
+
+Reglas del módulo de lógica:
+
+- **Sin UI de Compose.** El módulo entero viaja a QuickJS, donde no hay DOM ni
+  canvas. Por eso es un módulo aparte de :shared — el mismo reparto que usaba
+  Treehouse en Cash App (presenters separados de la UI).
+- **Sin red directa** (QuickJS no tiene fetch). Datos remotos = servicio del
+  anfitrión sobre el puente; es el siguiente hueco natural del contrato.
+- Versiones: el par Kotlin↔Zipline del proyecto del usuario debe casar con el
+  del runtime (hoy 2.3.21 ↔ 1.27.0, alineado con katapult-demo).
 
 ## Siguiente decisión (la cara)
 

@@ -23,11 +23,13 @@ import java.io.File
 fun main(args: Array<String>) {
     val dir = File(args.firstOrNull() ?: error("falta el directorio de módulos zipline"))
     val puerto = args.getOrNull(1)?.toIntOrNull() ?: 8081
-    // --watch <raizDelRepo>: lanza la compilación continua como subproceso,
-    // para que `goDev` sea UN solo comando (guardas → recompila → el iPhone
-    // recarga). Sin él, goServe solo sirve y la recompilación va aparte.
+    // --watch <raizDelRepo> <rutaDeTarea>: lanza la compilación continua como
+    // subproceso, para que `goDev` sea UN solo comando (guardas → recompila →
+    // el iPhone recarga). La tarea llega como argumento porque este servidor
+    // también corre en el proyecto del usuario (p. ej. ":logica-go:compile…").
     val indiceWatch = args.indexOf("--watch")
     val raizWatch = if (indiceWatch >= 0) File(args[indiceWatch + 1]) else null
+    val tareaWatch = if (indiceWatch >= 0) args[indiceWatch + 2] else null
 
     embeddedServer(Netty, port = puerto) {
         routing {
@@ -42,7 +44,7 @@ fun main(args: Array<String>) {
         // que el gradle anidado no pelea por los locks de arranque en frío.
         val vigilante = ProcessBuilder(
             File(raiz, "gradlew").absolutePath,
-            ":go-runtime:compileDevelopmentExecutableKotlinJsZipline",
+            tareaWatch ?: error("--watch requiere la ruta de la tarea"),
             "--continuous",
         )
             .directory(raiz)

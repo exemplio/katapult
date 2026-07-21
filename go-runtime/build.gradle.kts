@@ -10,13 +10,15 @@
  *  - jsMain:     la lógica que VIAJA — se compila a .zipline y se descarga en caliente.
  *  - jvmMain:    el anfitrión de prueba en Linux; katapult-go (iOS) hará este papel después.
  *
- * Zipline 1.22.0 es la versión construida con Kotlin 2.2.0, la de este repo.
- * Su plugin de compilador exige que coincidan: no subir una sin la otra.
+ * Par de versiones: Kotlin 2.3.21 ↔ Zipline 1.27.0 (construido con 2.3.20).
+ * La MISMA que katapult-demo: el plugin de compilador de Zipline corre en el
+ * build del usuario y el bytecode tiene que casar con el loader del IPA.
  */
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
-    id("app.cash.zipline") version "1.22.0"
+    id("app.cash.zipline") version "1.27.0"
+    `maven-publish`
 }
 
 kotlin {
@@ -40,14 +42,14 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            api("app.cash.zipline:zipline:1.22.0")
+            api("app.cash.zipline:zipline:1.27.0")
         }
         // El anfitrión es el mismo en JVM y en iOS; solo cambia el HTTP client
         // (OkHttp / URLSession). Mismo reparto que el sample world-clock de Zipline.
         val hostMain by creating {
             dependsOn(commonMain.get())
             dependencies {
-                implementation("app.cash.zipline:zipline-loader:1.22.0")
+                implementation("app.cash.zipline:zipline-loader:1.27.0")
             }
         }
         jvmMain {
@@ -91,6 +93,8 @@ tasks.register<JavaExec>("goHost") {
     dependsOn(jvmCompilation.compileTaskProvider)
     mainClass.set("dev.katapult.go.HostKt")
     classpath(jvmCompilation.output.allOutputs, project.provider { jvmCompilation.runtimeDependencyFiles })
+    // -PgoManifest=http://… para apuntar a otro servidor (p. ej. el del demo).
+    providers.gradleProperty("goManifest").orNull?.let { args(it) }
 }
 
 // -PgoPort=8082 para cambiar el puerto (p. ej. para probar sin pisar el 8081).
@@ -117,5 +121,6 @@ tasks.register<JavaExec>("goDev") {
     args(
         ziplineDevDir.get().asFile.absolutePath, goPort,
         "--watch", rootProject.rootDir.absolutePath,
+        "${project.path}:compileDevelopmentExecutableKotlinJsZipline",
     )
 }
