@@ -45,7 +45,7 @@ data class KatapultConfig(
         }
 
         fun loadOrFail(dir: File = File(".")): KatapultConfig =
-            load(dir) ?: error("No existe $FILE_NAME en este directorio. Corre `katapult init` primero.")
+            load(dir) ?: fail("No existe $FILE_NAME en este directorio. Corre `katapult init` primero.")
     }
 
     fun save(dir: File = File(".")) {

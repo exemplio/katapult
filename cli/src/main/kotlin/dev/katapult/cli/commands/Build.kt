@@ -2,6 +2,8 @@ package dev.katapult.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.choice
 import dev.katapult.cli.KatapultConfig
 import dev.katapult.cli.capture
@@ -15,6 +17,16 @@ class Build : CliktCommand(
 ) {
     private val platform by argument(help = "Plataforma destino").choice("ios")
 
+    /**
+     * Kotlin/Native en Release optimiza el programa completo, y eso es lo que
+     * domina el tiempo de compilación. Para iterar no hace falta: el binario
+     * Debug corre nativo igual, solo sin optimizar.
+     */
+    private val release by option(
+        "--release",
+        help = "Compila optimizado (más lento). Por defecto Debug, que es mucho más rápido.",
+    ).flag()
+
     override fun run() {
         val cfg = KatapultConfig.loadOrFail()
 
@@ -25,8 +37,9 @@ class Build : CliktCommand(
         // Run previo más reciente, para detectar el nuevo tras el dispatch.
         val previous = latestRunId(cfg.workflowFile)
 
-        echo("→ Disparando ${cfg.workflowFile} en GitHub Actions…")
-        if (run("gh", "workflow", "run", cfg.workflowFile) != 0)
+        val configuration = if (release) "Release" else "Debug"
+        echo("→ Disparando ${cfg.workflowFile} en GitHub Actions ($configuration)…")
+        if (run("gh", "workflow", "run", cfg.workflowFile, "-f", "configuration=$configuration") != 0)
             fail("No se pudo disparar el workflow. ¿Está pusheado ${cfg.workflowFile} en el default branch?")
 
         // GitHub registra el run con un pequeño retraso.

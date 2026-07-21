@@ -1,0 +1,12 @@
+{
+    "appName": "KatapultGo",
+    "bundleId": "dev.katapult.go",
+    "scheme": "KatapultGo",
+    "xcodeProject": "katapult-go/KatapultGo.xcodeproj",
+    "runnerImage": "macos-26",
+    "workflowFile": "katapult-go.yml",
+    "artifactName": "katapult-go-unsigned",
+    "zsignPath": "~/Downloads/zsign/zsign",
+    "certificatePath": "~/Downloads/zsign/certificado.p12",
+    "provisioningProfile": "~/Downloads/zsign/test.mobileprovision"
+}

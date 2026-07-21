@@ -6,6 +6,12 @@ name: __APP_NAME__ iOS (unsigned)
 
 on:
   workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Debug compila mucho más rápido (sin LTO); Release optimiza el binario'
+        type: choice
+        options: [Debug, Release]
+        default: Debug
   push:
     tags:
       - 'v*'
@@ -16,6 +22,11 @@ jobs:
     # Multiplatform 1.11+ necesita el SDK de iOS 26 (macos-26). Ajustable con
     # "runnerImage" en katapult.json.
     runs-on: __RUNNER_IMAGE__
+    env:
+      # Los tags (releases) compilan optimizado; los builds a mano, en Debug.
+      # Kotlin/Native en Release hace optimización de programa completo, que es
+      # lo que domina el tiempo de compilación.
+      CONFIGURATION: ${{ inputs.configuration || 'Release' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,16 +37,45 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Cachea dependencias y el compilador Kotlin/Native (~1GB) entre builds
+      # Cachea dependencias y el caché de tareas de Gradle entre builds
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
 
+      # Se aplican a la invocación de Gradle que hace Xcode desde su Run Script,
+      # que es donde se compila el framework de Kotlin/Native. Van en el home de
+      # Gradle para no tocar el gradle.properties del usuario.
+      - name: Ajustes de Gradle para CI
+        run: |
+          mkdir -p ~/.gradle
+          cat >> ~/.gradle/gradle.properties <<'PROPS'
+          org.gradle.caching=true
+          org.gradle.parallel=true
+          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g
+          # Recompila solo los klibs tocados en vez de todo el módulo (experimental)
+          kotlin.incremental.native=true
+          PROPS
+
+      # El compilador de Kotlin/Native y sus dependencias (~1 GB). Sin esto, cada
+      # build se lo vuelve a descargar.
       - name: Cache Kotlin/Native
         uses: actions/cache@v4
         with:
           path: ~/.konan
           key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
           restore-keys: ${{ runner.os }}-konan-
+
+      # Objetos intermedios de Xcode. Permite que el enlazado y los recursos se
+      # reutilicen; la clave incluye la configuración porque Debug y Release no
+      # comparten artefactos.
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: build/DerivedData
+          key: ${{ runner.os }}-dd-${{ env.CONFIGURATION }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-dd-${{ env.CONFIGURATION }}-
 
       # CocoaPods solo si el proyecto lo usa (el wizard KMP puro no lo necesita)
       - name: CocoaPods (si aplica)
@@ -46,12 +86,12 @@ jobs:
 
       # Compila SIN firmar. Xcode invoca a Gradle para compilar el framework
       # Kotlin/Native (embedAndSignAppleFrameworkForXcode) durante este paso.
-      - name: Compilar .app sin firmar
+      - name: Compilar .app sin firmar ($CONFIGURATION)
         run: |
           xcodebuild \
             -project __XCODE_PROJECT__ \
             -scheme __SCHEME__ \
-            -configuration Release \
+            -configuration "$CONFIGURATION" \
             -sdk iphoneos \
             -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
@@ -60,7 +100,8 @@ jobs:
 
       - name: Empaquetar en .ipa
         run: |
-          APP_PATH=$(find build/DerivedData/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -1)
+          APP_PATH=$(find "build/DerivedData/Build/Products/$CONFIGURATION-iphoneos" \
+            -maxdepth 1 -name '*.app' | head -1)
           test -n "$APP_PATH" || { echo "No se encontró el .app"; exit 1; }
           mkdir -p Payload
           cp -r "$APP_PATH" Payload/
