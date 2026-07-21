@@ -1,0 +1,53 @@
+# Compila Katapult Go (el dev client) sin firmar, en un runner macOS.
+# El IPA resultante se firma localmente con `katapult sign` y se instala con
+# `katapult install` — el mismo flujo de la Fase 1.
+name: Katapult Go (unsigned)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'go-v*'
+
+jobs:
+  build:
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: katapult-go
+    steps:
+      - uses: actions/checkout@v4
+
+      # XcodeGen convierte project.yml en un .xcodeproj real. Así no versionamos
+      # el .pbxproj, que es ilegible y conflictivo.
+      - name: Instalar XcodeGen
+        run: brew install xcodegen
+
+      - name: Generar el proyecto Xcode
+        run: xcodegen generate
+
+      - name: Compilar .app sin firmar
+        run: |
+          xcodebuild \
+            -project KatapultGo.xcodeproj \
+            -scheme KatapultGo \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Empaquetar en .ipa
+        run: |
+          APP=$(find build/DerivedData/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -1)
+          test -n "$APP" || { echo "No se encontró el .app"; exit 1; }
+          mkdir -p Payload
+          cp -r "$APP" Payload/
+          zip -qr "KatapultGo-unsigned.ipa" Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: katapult-go-unsigned
+          path: katapult-go/KatapultGo-unsigned.ipa
+          retention-days: 7

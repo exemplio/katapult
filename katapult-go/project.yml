@@ -1,0 +1,48 @@
+# Spec de XcodeGen: genera el .xcodeproj en CI, para no mantener a mano un
+# .pbxproj (que es ilegible y da conflictos constantes en git).
+name: KatapultGo
+
+options:
+  bundleIdPrefix: dev.katapult
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+targets:
+  KatapultGo:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.katapult.go
+        PRODUCT_NAME: Katapult Go
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"     # iPhone + iPad
+        # El IPA sale SIN firmar de CI; se firma después con `katapult sign`.
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: Katapult Go
+        CFBundleShortVersionString: "0.1.0"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+
+        # El dev server corre en HTTP plano dentro de la LAN. Sin esta excepción
+        # iOS bloquea la conexión (App Transport Security exige HTTPS por defecto).
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+
+        # iOS 14+ pide permiso explícito para hablar con la red local.
+        NSLocalNetworkUsageDescription: >-
+          Katapult Go se conecta al servidor de desarrollo que corre en tu
+          computadora para cargar tu app.
