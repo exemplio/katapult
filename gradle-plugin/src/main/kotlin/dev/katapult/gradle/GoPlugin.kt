@@ -100,7 +100,8 @@ class GoPlugin : Plugin<Project> {
 
             project.tasks.register("goDev", JavaExec::class.java) { task ->
                 task.group = "katapult"
-                task.description = "Todo en uno: sirve + anuncia por mDNS + recompila la lógica al guardar."
+                task.description = "Todo en uno: sirve + anuncia por mDNS + recompila la lógica al guardar" +
+                    " (+ espejo, si katapultGo { espejo = … } está configurado)."
                 task.dependsOn(tareaZipline)
                 task.mainClass.set("dev.katapult.go.ServidorGoKt")
                 task.classpath(servidorCp)
@@ -109,6 +110,11 @@ class GoPlugin : Plugin<Project> {
                     "--watch", project.rootDir.absolutePath,
                     "${project.path}:$tareaZipline",
                 )
+                // El espejo como subproceso hermano del vigilante: un comando,
+                // dos servidores, dos filas en "En tu red".
+                ext.espejo.orNull?.let { tareaEspejo ->
+                    task.args("--espejo", project.rootDir.absolutePath, tareaEspejo)
+                }
             }
         }
     }

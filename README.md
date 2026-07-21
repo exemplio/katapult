@@ -81,14 +81,17 @@ Se activa con dos líneas en un módulo de tu proyecto KMP:
 plugins { id("dev.katapult.go") version "0.1.0" }
 
 katapultGo {
-    logica = "com.tuapp.golog.MiLogica"   // tu implementación de GoLogica
+    logica = "com.tuapp.golog.MiLogica"    // tu implementación de GoLogica
+    espejo = ":shared:katapultMirror"      // opcional: goDev arranca también el espejo
 }
 ```
 
 ```bash
 ./gradlew :tu-modulo:goDev
 # sirve en :8081, se anuncia por mDNS (la app lo lista en "En tu red", como
-# Expo Go), imprime un QR con deep link katapult:// y recompila al guardar
+# Expo Go), imprime un QR con deep link katapult:// y recompila al guardar.
+# Con `espejo` configurado levanta además el espejo en :8080: un solo comando
+# y en el iPhone salen las dos filas, "Espejo" y "Go (Zipline)".
 ```
 
 Los límites son deliberados: el catálogo es fijo (Apple prohíbe descargar

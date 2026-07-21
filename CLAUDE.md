@@ -117,6 +117,9 @@ Coste por frame en el EDT: render 2,0 ms + copia 0,7 ms + lectura 1,9 ms.
 # piezas sueltas: goServe (solo servir+anunciar), goHost (anfitrión JVM de
 # consola), serveDevelopmentZipline --continuous (la de Zipline, sin mDNS).
 # Mismo puerto 8081 todas (-PgoPort=NNNN en goDev/goServe): solo una a la vez.
+# Con katapultGo { espejo = ":shared:katapultMirror" } (así está katapult-demo),
+# goDev levanta TAMBIÉN el espejo como subproceso: un comando, dos servidores,
+# dos filas en "En tu red" (Espejo y Go). Ambos mueren con el goDev padre.
 
 # Verificar el código iOS desde Linux (solo klib; el framework lo enlaza CI)
 ./gradlew :go-runtime:compileKotlinIosArm64

@@ -30,6 +30,12 @@ fun main(args: Array<String>) {
     val indiceWatch = args.indexOf("--watch")
     val raizWatch = if (indiceWatch >= 0) File(args[indiceWatch + 1]) else null
     val tareaWatch = if (indiceWatch >= 0) args[indiceWatch + 2] else null
+    // --espejo <raizDelRepo> <rutaDeTarea>: lanza también el espejo (p. ej.
+    // ":shared:katapultMirror"), que se anuncia solo por mDNS con modo=espejo.
+    // Así un único goDev pone las dos filas en el iPhone.
+    val indiceEspejo = args.indexOf("--espejo")
+    val raizEspejo = if (indiceEspejo >= 0) File(args[indiceEspejo + 1]) else null
+    val tareaEspejo = if (indiceEspejo >= 0) args[indiceEspejo + 2] else null
 
     embeddedServer(Netty, port = puerto) {
         routing {
@@ -40,24 +46,13 @@ fun main(args: Array<String>) {
     }.start(wait = false)
 
     raizWatch?.let { raiz ->
-        // El daemon de Gradle ya está caliente (esta JVM la arrancó él), así
-        // que el gradle anidado no pelea por los locks de arranque en frío.
-        val vigilante = ProcessBuilder(
-            File(raiz, "gradlew").absolutePath,
-            tareaWatch ?: error("--watch requiere la ruta de la tarea"),
-            "--continuous",
-        )
-            .directory(raiz)
-            .redirectErrorStream(true)
-            .start()
-        // Sus líneas van a esta misma terminal, prefijadas para distinguirlas.
-        Thread {
-            vigilante.inputStream.bufferedReader().forEachLine { linea ->
-                if (linea.isNotBlank()) println("[compila] $linea")
-            }
-        }.apply { isDaemon = true }.start()
-        Runtime.getRuntime().addShutdownHook(Thread { vigilante.destroy() })
+        lanzarGradle(raiz, tareaWatch ?: error("--watch requiere la ruta de la tarea"), "compila", "--continuous")
         println("→ Vigilando cambios en jsMain: guarda y el iPhone recarga solo.")
+    }
+
+    raizEspejo?.let { raiz ->
+        lanzarGradle(raiz, tareaEspejo ?: error("--espejo requiere la ruta de la tarea"), "espejo")
+        println("→ Espejo arrancando (tarda lo que tarde su compilación; saldrá con prefijo [espejo]).")
     }
 
     println("→ Módulos Zipline en http://0.0.0.0:$puerto (dir: $dir)")
@@ -74,4 +69,25 @@ fun main(args: Array<String>) {
     }
 
     Thread.currentThread().join()
+}
+
+/**
+ * Lanza una tarea de Gradle como subproceso ligado a la vida de este servidor:
+ * sus líneas salen aquí con prefijo y muere con nosotros (shutdown hook).
+ *
+ * El daemon de Gradle ya está caliente (esta JVM la arrancó él), así que los
+ * gradles anidados no pelean por los locks de arranque en frío.
+ */
+private fun lanzarGradle(raiz: File, tarea: String, prefijo: String, vararg flags: String): Process {
+    val proceso = ProcessBuilder(File(raiz, "gradlew").absolutePath, tarea, *flags)
+        .directory(raiz)
+        .redirectErrorStream(true)
+        .start()
+    Thread {
+        proceso.inputStream.bufferedReader().forEachLine { linea ->
+            if (linea.isNotBlank()) println("[$prefijo] $linea")
+        }
+    }.apply { isDaemon = true }.start()
+    Runtime.getRuntime().addShutdownHook(Thread { proceso.destroy() })
+    return proceso
 }

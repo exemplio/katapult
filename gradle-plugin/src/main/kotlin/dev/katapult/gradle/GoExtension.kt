@@ -19,4 +19,12 @@ abstract class GoExtension {
 
     /** Puerto del servidor de módulos (goServe/goDev). El espejo usa el 8080. */
     abstract val port: Property<Int>
+
+    /**
+     * Ruta de la tarea del espejo (p. ej. ":shared:katapultMirror"). Si se
+     * configura, `goDev` la lanza también: UN comando levanta los dos
+     * servidores y en el iPhone salen las dos filas, "Espejo" y "Go (Zipline)".
+     * No se puede autodetectar: el espejo vive en otro módulo.
+     */
+    abstract val espejo: Property<String>
 }
