@@ -121,14 +121,16 @@ Coste por frame en el EDT: render 2,0 ms + copia 0,7 ms + lectura 1,9 ms.
 # Verificar el código iOS desde Linux (solo klib; el framework lo enlaza CI)
 ./gradlew :go-runtime:compileKotlinIosArm64
 
-# Build + firma + instalación de katapult-go (el katapult.json de ESTE repo
-# ya apunta a KatapultGo). El build gasta minutos de Actions del usuario:
-# no dispararlo sin que lo pida.
-gh workflow run katapult-go.yml                        # compila en macos-26
-gh run download <run-id> -n katapult-go-unsigned -D katapult-go/dist
-./build/install/katapult/bin/katapult sign --ipa katapult-go/dist/KatapultGo-unsigned.ipa
-./build/install/katapult/bin/katapult install --ipa katapult-go/dist/KatapultGo-firmada.ipa
+# Build + firma + instalación de katapult-go, todo en uno (gasta minutos de
+# Actions del usuario: no dispararlo sin que lo pida). Pasos sueltos dentro.
+./scripts/actualizar-go.sh
 ```
+
+El catálogo de widgets del modo Go (13 piezas, contenedores anidables) vive en
+go-runtime/…/GoElemento.kt + katapult-go/Sources/GoCatalogo.swift; diseño y
+criterio de crecimiento en docs/CATALOGO_GO_PROPUESTA.md. Añadir una pieza =
+cambio de contrato: publishToMavenLocal + IPA nuevo, y los campos nuevos
+SIEMPRE con valor por defecto (hay apps viejas instaladas).
 
 ## Arquitectura del espejo
 

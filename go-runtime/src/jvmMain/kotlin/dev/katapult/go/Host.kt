@@ -48,15 +48,39 @@ fun main(args: Array<String>) {
 private fun render(pantalla: GoPantalla, version: Int) {
     val ancho = 64
     println("┌" + "─".repeat(ancho) + "┐")
-    println("│ ${pantalla.titulo.padEnd(ancho - 2)} │")
+    println("│ ${pantalla.titulo.padEnd(ancho - 2).take(ancho - 2)} │")
     println("├" + "─".repeat(ancho) + "┤")
     for (elemento in pantalla.elementos) {
-        val linea = when (elemento) {
-            is GoElemento.Texto -> if (elemento.destacado) "» ${elemento.texto}" else elemento.texto
-            is GoElemento.Boton -> "[ ${elemento.etiqueta} ]"
-            is GoElemento.Campo -> "${elemento.pista}: ${elemento.valor.ifEmpty { "_" }}"
+        for (linea in lineas(elemento, "")) {
+            println("│ ${linea.padEnd(ancho - 2).take(ancho - 2)} │")
         }
-        println("│ ${linea.padEnd(ancho - 2)} │")
     }
     println("└" + "─".repeat(ancho) + "┘  (lógica v$version)")
+}
+
+// Aproximación en texto de cada pieza del catálogo, recursiva en contenedores.
+private fun lineas(e: GoElemento, sangria: String): List<String> = when (e) {
+    is GoElemento.Texto -> {
+        val prefijo = when (e.estilo) {
+            EstiloTexto.TITULO -> "══ "
+            EstiloTexto.SUBTITULO -> "» "
+            EstiloTexto.CUERPO -> ""
+            EstiloTexto.PIE -> "· "
+        }
+        listOf(sangria + prefijo + e.texto)
+    }
+    is GoElemento.Boton -> listOf("$sangria[ ${e.etiqueta}${if (e.habilitado) "" else " (off)"} ]")
+    is GoElemento.Campo -> listOf("$sangria${e.pista}: ${if (e.seguro) "•".repeat(e.valor.length) else e.valor.ifEmpty { "_" }}")
+    is GoElemento.Interruptor -> listOf("$sangria(${if (e.activo) "●" else "○"}) ${e.etiqueta}")
+    is GoElemento.Deslizador -> listOf("$sangria├─ ${e.valor} ─┤ [${e.minimo}..${e.maximo}]")
+    is GoElemento.Imagen -> listOf("$sangria🖼  ${e.url.substringAfterLast('/')}")
+    is GoElemento.Progreso -> listOf(sangria + (e.valor?.let { "▓".repeat((it * 10).toInt()) + "░".repeat(10 - (it * 10).toInt()) } ?: "◌ …"))
+    is GoElemento.Separador -> listOf("$sangria────────")
+    is GoElemento.Espacio -> listOf("")
+    is GoElemento.Columna -> e.hijos.flatMap { lineas(it, sangria) }
+    is GoElemento.Fila -> e.hijos.flatMap { lineas(it, sangria) } // en texto, apilada
+    is GoElemento.Tarjeta -> e.hijos.flatMap { lineas(it, "$sangria▕ ") }
+    is GoElemento.Tocable -> e.hijos.flatMap { lineas(it, sangria) }.mapIndexed { i, l ->
+        if (i == 0) "$l  ⇢ toca:${e.id}" else l
+    }
 }

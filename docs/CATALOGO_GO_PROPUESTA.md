@@ -1,9 +1,11 @@
-# Catálogo Go v2 — propuesta (NO implementada)
+# Catálogo Go v2 — IMPLEMENTADO (julio 2026)
 
-> Documento de diseño, julio de 2026. Decisión del proyecto: ampliar el
-> catálogo para cubrir la mayor cantidad de casos posible, asumiendo el coste
-> de mantenimiento. Este MD fija el QUÉ antes de escribir el CÓMO.
-> El catálogo vigente sigue siendo el mínimo del paso 0: Texto, Boton, Campo.
+> Nació como documento de diseño y se implementó el mismo día. El código
+> canónico: [GoElemento.kt](../go-runtime/src/commonMain/kotlin/dev/katapult/go/GoElemento.kt)
+> (contrato) y [GoCatalogo.swift](../katapult-go/Sources/GoCatalogo.swift)
+> (render SwiftUI recursivo). Ejemplo completo con grid de imágenes y
+> navegación lista→detalle: LogicaMuseo.kt en katapult-demo.
+> Este MD queda como referencia de diseño y criterio de crecimiento.
 
 ## Principio de diseño
 

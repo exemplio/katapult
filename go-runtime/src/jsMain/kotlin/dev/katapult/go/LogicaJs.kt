@@ -22,14 +22,21 @@ class LogicaReal : GoLogica {
             add(
                 GoElemento.Texto(
                     if (nombre.isBlank()) "¿Cómo te llamas?" else "¡Hola, $nombre! 👋",
-                    destacado = true,
+                    estilo = EstiloTexto.TITULO,
                 ),
             )
             add(GoElemento.Campo(id = "nombre", pista = "escribe tu nombre", valor = borrador))
-            add(GoElemento.Boton(id = "saludar", etiqueta = "Saludar"))
-            add(GoElemento.Texto("Contador: $contador"))
-            add(GoElemento.Boton(id = "sumar", etiqueta = "+1"))
-            add(GoElemento.Boton(id = "reiniciar", etiqueta = "Reiniciar"))
+            add(GoElemento.Boton(id = "saludar", etiqueta = "Saludar", estilo = EstiloBoton.PROMINENTE))
+            add(GoElemento.Separador)
+            add(GoElemento.Texto("Contador: $contador", estilo = EstiloTexto.SUBTITULO))
+            add(
+                GoElemento.Fila(
+                    listOf(
+                        GoElemento.Boton(id = "sumar", etiqueta = "+1"),
+                        GoElemento.Boton(id = "reiniciar", etiqueta = "Reiniciar", estilo = EstiloBoton.DESTRUCTIVO),
+                    ),
+                ),
+            )
         },
     )
 

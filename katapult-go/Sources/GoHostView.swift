@@ -46,11 +46,15 @@ struct GoHostView: View {
                             Text(titulo)
                                 .font(.title2.bold())
 
-                            // El mini-catálogo del paso 0: la lógica manda QUÉ
-                            // mostrar; estos son los tres widgets que el binario
-                            // sabe pintar.
+                            // El catálogo v2: la lógica manda QUÉ mostrar como
+                            // árbol de GoElemento; ElementoView (GoCatalogo.swift)
+                            // lo pinta recursivamente con SwiftUI nativo.
                             ForEach(Array(elementos.enumerated()), id: \.offset) { _, elemento in
-                                vista(de: elemento)
+                                ElementoView(
+                                    elemento: elemento,
+                                    enviar: { id, valor in anfitrion.evento(id: id, valor: valor) },
+                                    borradores: $borradores
+                                )
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -79,37 +83,6 @@ struct GoHostView: View {
         } message: {
             Text(manifestURL.absoluteString)
         }
-    }
-
-    /// Pinta un elemento del catálogo. Los sealed de Kotlin llegan a Swift
-    /// como subclases (GoElementoTexto, GoElementoBoton, GoElementoCampo).
-    @ViewBuilder
-    private func vista(de elemento: GoElemento) -> some View {
-        if let texto = elemento as? GoElementoTexto {
-            Text(texto.texto)
-                .font(texto.destacado ? .headline : .body)
-        } else if let boton = elemento as? GoElementoBoton {
-            Button(boton.etiqueta) {
-                anfitrion.evento(id: boton.id, valor: nil)
-            }
-            .buttonStyle(.borderedProminent)
-        } else if let campo = elemento as? GoElementoCampo {
-            TextField(campo.pista, text: enlace(para: campo))
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
-        }
-    }
-
-    /// Binding del campo: lee/escribe el borrador local y reenvía cada cambio
-    /// a la lógica, que decide qué hacer con él.
-    private func enlace(para campo: GoElementoCampo) -> Binding<String> {
-        Binding(
-            get: { borradores[campo.id] ?? campo.valor },
-            set: { nuevo in
-                borradores[campo.id] = nuevo
-                anfitrion.evento(id: campo.id, valor: nuevo)
-            }
-        )
     }
 
     private func arrancar() {

@@ -32,22 +32,5 @@ data class GoPantalla(
     val elementos: List<GoElemento>,
 )
 
-/**
- * El mini-catálogo del paso 0: tres elementos. Cada tipo nuevo que se añada
- * aquí exige release de la app — ese es el techo estructural de la Opción D,
- * y la razón de mantener esta lista corta y pensada.
- */
-@Serializable
-sealed interface GoElemento {
-    @Serializable
-    @SerialName("texto")
-    data class Texto(val texto: String, val destacado: Boolean = false) : GoElemento
-
-    @Serializable
-    @SerialName("boton")
-    data class Boton(val id: String, val etiqueta: String) : GoElemento
-
-    @Serializable
-    @SerialName("campo")
-    data class Campo(val id: String, val pista: String, val valor: String) : GoElemento
-}
+// El catálogo de elementos vive en GoElemento.kt (archivo aparte a propósito:
+// el contrato de esta interface casi nunca debe cambiar; el catálogo crece).
