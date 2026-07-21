@@ -31,23 +31,29 @@ interpretado (permitido por Apple); la UI vive fija en el binario.
 
 ## Cómo se ejecuta
 
-Dos terminales, **en orden** (ver "Trampas" sobre el lock de Gradle):
+**Un solo comando** (el equivalente a `npx expo start`):
 
 ```bash
-# 1. Servidor de módulos: sirve en :8081, se anuncia por mDNS e imprime QR
-./gradlew :go-runtime:goServe
-
-# 2. Anfitrión: descarga la lógica, la ejecuta en QuickJS, re-renderiza cada segundo
-./gradlew :go-runtime:goHost
-
-# Para recompilar la lógica al guardar, en una tercera terminal (o en vez de
-# goServe si no necesitas anuncio: serveDevelopmentZipline hace ambas cosas):
-./gradlew :go-runtime:compileDevelopmentExecutableKotlinJsZipline --continuous
+./gradlew :go-runtime:goDev
 ```
 
-`goServe` es nuestro (Ktor estático + JmDNS + QR); `serveDevelopmentZipline`
-es la tarea de Zipline: compila en continuo y sirve, pero no se anuncia. Ambas
-usan el puerto 8081 — una o la otra, no las dos.
+Hace las tres cosas: sirve los módulos en :8081, se anuncia por mDNS (+ QR en
+la terminal), y vigila jsMain — guardas y el iPhone recarga solo. El vigilante
+es un `gradlew … --continuous` que `ServidorGo` lanza como subproceso (sus
+líneas salen prefijadas con `[compila]`).
+
+Piezas sueltas, si se necesitan por separado:
+
+```bash
+./gradlew :go-runtime:goServe    # solo servir + anunciar (sin recompilación)
+./gradlew :go-runtime:goHost     # anfitrión JVM de consola (probar sin iPhone)
+./gradlew :go-runtime:compileDevelopmentExecutableKotlinJsZipline --continuous
+./gradlew :go-runtime:serveDevelopmentZipline --continuous  # la de Zipline:
+                                 # compila y sirve, pero no se anuncia por mDNS
+```
+
+Todas las variantes de servidor usan el puerto 8081 (`-PgoPort=NNNN` para
+cambiarlo en goDev/goServe) — solo una a la vez.
 
 Con ambos corriendo, edita algo visible en
 `go-runtime/src/jsMain/kotlin/dev/katapult/go/LogicaJs.kt` y guarda: el

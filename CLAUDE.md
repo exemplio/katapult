@@ -108,17 +108,23 @@ Coste por frame en el EDT: render 2,0 ms + copia 0,7 ms + lectura 1,9 ms.
 # Publicar los módulos para que katapult-demo los resuelva
 ./gradlew :mirror-runtime:publishToMavenLocal :gradle-plugin:publishToMavenLocal
 
-# Katapult Go paso 0 (lógica dinámica Zipline) — dos terminales, EN ORDEN
-# (lanzarlos a la vez en frío choca con el lock de Gradle)
-./gradlew :go-runtime:goServe                                # sirve en :8081 + mDNS + QR
-./gradlew :go-runtime:goHost                                 # anfitrión JVM
-# recompilar la lógica al guardar (tercera terminal):
-./gradlew :go-runtime:compileDevelopmentExecutableKotlinJsZipline --continuous
-# alternativa sin anuncio mDNS que compila Y sirve (no junto con goServe: mismo puerto):
-./gradlew :go-runtime:serveDevelopmentZipline --continuous
+# Katapult Go (lógica dinámica Zipline) — el comando único de desarrollo:
+# sirve en :8081 + anuncia por mDNS + QR + recompila jsMain al guardar
+./gradlew :go-runtime:goDev
+# piezas sueltas: goServe (solo servir+anunciar), goHost (anfitrión JVM de
+# consola), serveDevelopmentZipline --continuous (la de Zipline, sin mDNS).
+# Mismo puerto 8081 todas (-PgoPort=NNNN en goDev/goServe): solo una a la vez.
 
 # Verificar el código iOS desde Linux (solo klib; el framework lo enlaza CI)
 ./gradlew :go-runtime:compileKotlinIosArm64
+
+# Build + firma + instalación de katapult-go (el katapult.json de ESTE repo
+# ya apunta a KatapultGo). El build gasta minutos de Actions del usuario:
+# no dispararlo sin que lo pida.
+gh workflow run katapult-go.yml                        # compila en macos-26
+gh run download <run-id> -n katapult-go-unsigned -D katapult-go/dist
+./build/install/katapult/bin/katapult sign --ipa katapult-go/dist/KatapultGo-unsigned.ipa
+./build/install/katapult/bin/katapult install --ipa katapult-go/dist/KatapultGo-firmada.ipa
 ```
 
 ## Arquitectura del espejo

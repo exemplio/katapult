@@ -11,10 +11,10 @@ import app.cash.zipline.Zipline
  */
 class LogicaReal : GoLogica {
     override fun pantalla(contador: Int) = GoPantalla(
-        titulo = "Hola desde QuickJS 🚀",
+        titulo = "⚡ Recargado en caliente desde tu Linux",
         lineas = listOf(
-            "Este texto llegó por la red, compilado a bytecode.",
-            "Edita LogicaJs.kt y guarda: el anfitrión recarga solo.",
+            "Este código lo editó Ricardox mientras mirabas la pantalla.",
+            "Sin recompilar nativo, sin reinstalar, sin tocar el iPhone.",
             "Ticks del anfitrión: $contador",
         ),
     )

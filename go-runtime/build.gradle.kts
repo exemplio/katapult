@@ -93,13 +93,29 @@ tasks.register<JavaExec>("goHost") {
     classpath(jvmCompilation.output.allOutputs, project.provider { jvmCompilation.runtimeDependencyFiles })
 }
 
+// -PgoPort=8082 para cambiar el puerto (p. ej. para probar sin pisar el 8081).
+val goPort = providers.gradleProperty("goPort").getOrElse("8081")
+val ziplineDevDir = layout.buildDirectory.dir("zipline/Development")
+
 tasks.register<JavaExec>("goServe") {
     group = "katapult"
-    description = "Sirve los módulos Zipline en :8081 y anuncia el servidor por mDNS (con QR)."
+    description = "Sirve los módulos Zipline en :$goPort y anuncia el servidor por mDNS (con QR)."
     // Compila la lógica una vez; para recompilar al guardar, corre en paralelo
-    // compileDevelopmentExecutableKotlinJsZipline --continuous.
+    // compileDevelopmentExecutableKotlinJsZipline --continuous (o usa goDev).
     dependsOn(jvmCompilation.compileTaskProvider, "compileDevelopmentExecutableKotlinJsZipline")
     mainClass.set("dev.katapult.go.ServidorGoKt")
     classpath(jvmCompilation.output.allOutputs, project.provider { jvmCompilation.runtimeDependencyFiles })
-    args(layout.buildDirectory.dir("zipline/Development").get().asFile.absolutePath, "8081")
+    args(ziplineDevDir.get().asFile.absolutePath, goPort)
+}
+
+tasks.register<JavaExec>("goDev") {
+    group = "katapult"
+    description = "Todo en uno: sirve + anuncia por mDNS + recompila la lógica al guardar."
+    dependsOn(jvmCompilation.compileTaskProvider, "compileDevelopmentExecutableKotlinJsZipline")
+    mainClass.set("dev.katapult.go.ServidorGoKt")
+    classpath(jvmCompilation.output.allOutputs, project.provider { jvmCompilation.runtimeDependencyFiles })
+    args(
+        ziplineDevDir.get().asFile.absolutePath, goPort,
+        "--watch", rootProject.rootDir.absolutePath,
+    )
 }
