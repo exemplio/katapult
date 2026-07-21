@@ -72,3 +72,92 @@ jobs:
           name: __ARTIFACT_NAME__
           path: __APP_NAME__-unsigned.ipa
           retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Firma + publicación OTA. Corre en LINUX a propósito: zsign no necesita macOS
+  # y los minutos Linux cuestan 1x en vez de 10x.
+  #
+  # Solo se activa si el repo tiene configurados los secrets de firma. Sin ellos
+  # el job se salta y el flujo local (`katapult sign`) sigue funcionando igual.
+  # ---------------------------------------------------------------------------
+  sign-and-release:
+    needs: build-ios
+    runs-on: ubuntu-latest
+    if: vars.KATAPULT_OTA == 'true'
+    permissions:
+      contents: write        # crear el release donde vive el IPA
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Descargar el IPA sin firmar
+        uses: actions/download-artifact@v4
+        with:
+          name: __ARTIFACT_NAME__
+
+      - name: Instalar zsign
+        run: |
+          curl -sL -o zsign.tar.gz \
+            https://github.com/zhlynn/zsign/releases/download/v1.1.1/zsign-linux-x86_64.tar.gz
+          tar -xzf zsign.tar.gz
+          chmod +x $(find . -name zsign -type f | head -1)
+          echo "ZSIGN=$(find $PWD -name zsign -type f | head -1)" >> $GITHUB_ENV
+
+      - name: Restaurar certificado y perfil
+        env:
+          CERT_B64: ${{ secrets.KATAPULT_CERT_P12 }}
+          PROFILE_B64: ${{ secrets.KATAPULT_PROVISIONING_PROFILE }}
+        run: |
+          echo "$CERT_B64" | base64 -d > cert.p12
+          echo "$PROFILE_B64" | base64 -d > profile.mobileprovision
+
+      - name: Firmar
+        env:
+          CERT_PASSWORD: ${{ secrets.KATAPULT_CERT_PASSWORD }}
+        run: |
+          "$ZSIGN" -k cert.p12 -p "$CERT_PASSWORD" -m profile.mobileprovision \
+                   -o "__APP_NAME__.ipa" -z 9 "__APP_NAME__-unsigned.ipa"
+          rm -f cert.p12 profile.mobileprovision
+
+      # iOS instala por aire leyendo este manifest. Exige HTTPS con certificado
+      # válido: los Releases de GitHub lo cumplen.
+      - name: Generar manifest OTA
+        run: |
+          TAG="ota-${{ github.run_number }}"
+          IPA_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/__APP_NAME__.ipa"
+          cat > manifest.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict><key>items</key><array><dict>
+            <key>assets</key><array><dict>
+              <key>kind</key><string>software-package</string>
+              <key>url</key><string>${IPA_URL}</string>
+            </dict></array>
+            <key>metadata</key><dict>
+              <key>bundle-identifier</key><string>__BUNDLE_ID__</string>
+              <key>bundle-version</key><string>${{ github.run_number }}</string>
+              <key>kind</key><string>software</string>
+              <key>title</key><string>__APP_NAME__</string>
+            </dict>
+          </dict></array></dict>
+          </plist>
+          PLIST
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" "__APP_NAME__.ipa" manifest.plist \
+            --title "__APP_NAME__ (OTA #${{ github.run_number }})" \
+            --notes "Instalación OTA: abre el enlace de abajo desde el iPhone."
+
+          MANIFEST="https://github.com/${{ github.repository }}/releases/download/${TAG}/manifest.plist"
+          INSTALL="itms-services://?action=download-manifest&url=${MANIFEST}"
+          {
+            echo "## 📲 Instalar en el iPhone"
+            echo ""
+            echo "Abre este enlace **desde Safari en el iPhone**:"
+            echo ""
+            echo "\`${INSTALL}\`"
+          } >> $GITHUB_STEP_SUMMARY

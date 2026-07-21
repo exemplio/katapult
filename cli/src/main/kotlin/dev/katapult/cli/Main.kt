@@ -6,6 +6,7 @@ import dev.katapult.cli.commands.Build
 import dev.katapult.cli.commands.Doctor
 import dev.katapult.cli.commands.Init
 import dev.katapult.cli.commands.Install
+import dev.katapult.cli.commands.Ota
 import dev.katapult.cli.commands.Setup
 import dev.katapult.cli.commands.Sign
 
@@ -22,5 +23,5 @@ class Katapult : CliktCommand(
 }
 
 fun main(args: Array<String>) = Katapult()
-    .subcommands(Doctor(), Setup(), Init(), Build(), Sign(), Install())
+    .subcommands(Doctor(), Setup(), Init(), Build(), Sign(), Install(), Ota())
     .main(args)

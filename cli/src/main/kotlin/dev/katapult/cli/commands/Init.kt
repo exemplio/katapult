@@ -44,6 +44,7 @@ class Init : CliktCommand(
             .replace("__XCODE_PROJECT__", cfg.xcodeProject)
             .replace("__ARTIFACT_NAME__", cfg.artifactName)
             .replace("__RUNNER_IMAGE__", cfg.runnerImage)
+            .replace("__BUNDLE_ID__", cfg.bundleId)
 
         val wfFile = File(".github/workflows/${cfg.workflowFile}")
         if (wfFile.exists() && !force) fail("Ya existe ${wfFile.path}. Usa --force para sobrescribir.")
