@@ -45,12 +45,19 @@ struct AppHostView: View {
         .onReceive(NotificationCenter.default.publisher(for: .deviceDidShake)) { _ in
             showMenu = true
         }
-        .confirmationDialog("Katapult Go", isPresented: $showMenu, titleVisibility: .visible) {
-            Button("Recargar") { reloadToken += 1 }
-            Button("Cambiar servidor", action: onDisconnect)
-            Button("Cancelar", role: .cancel) {}
-        } message: {
-            Text(url.absoluteString)
+        .sheet(isPresented: $showMenu) {
+            MenuDesarrollo(
+                modo: "Espejo",
+                url: url,
+                acciones: [
+                    AccionMenu(titulo: "Recargar", icono: "arrow.clockwise") {
+                        loadError = nil
+                        reloadToken += 1
+                    },
+                    AccionMenu(titulo: "Ir al inicio", icono: "house", accion: onDisconnect),
+                ],
+                onCerrar: { showMenu = false },
+            )
         }
     }
 }

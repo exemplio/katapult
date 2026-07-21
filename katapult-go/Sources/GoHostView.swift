@@ -82,12 +82,18 @@ struct GoHostView: View {
         .onReceive(NotificationCenter.default.publisher(for: .deviceDidShake)) { _ in
             showMenu = true
         }
-        .confirmationDialog("Katapult Go", isPresented: $showMenu, titleVisibility: .visible) {
-            Button("Reconectar") { arrancar() }
-            Button("Cambiar servidor", action: onDisconnect)
-            Button("Cancelar", role: .cancel) {}
-        } message: {
-            Text(manifestURL.absoluteString)
+        .sheet(isPresented: $showMenu) {
+            MenuDesarrollo(
+                modo: "Go (Zipline)",
+                url: manifestURL,
+                detalle: version > 0 ? "lógica v\(version) cargada" : "esperando la primera lógica…",
+                acciones: [
+                    // Reinicia QuickJS y el estado de la lógica, no solo la vista.
+                    AccionMenu(titulo: "Recargar lógica", icono: "arrow.clockwise") { arrancar() },
+                    AccionMenu(titulo: "Ir al inicio", icono: "house", accion: onDisconnect),
+                ],
+                onCerrar: { showMenu = false },
+            )
         }
     }
 
