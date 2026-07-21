@@ -53,6 +53,9 @@ struct ElementoView: View {
                 ProgressView()
             }
 
+        } else if let lienzo = elemento as? GoElementoLienzo {
+            LienzoView(lienzo: lienzo)
+
         } else if elemento is GoElementoSeparador {
             Divider()
 
@@ -184,5 +187,86 @@ struct ElementoView: View {
         case Teclado.url: return .URL
         default: return .default
         }
+    }
+}
+
+/// El intérprete del Lienzo: órdenes de dibujo (datos que viajan) sobre un
+/// Canvas NATIVO de SwiftUI/Core Graphics. La válvula de escape visual del
+/// catálogo — gráficos y widgets custom sin release y sin web.
+///
+/// Coordenadas fraccionales (0..1 del tamaño real); radios/grosores/letras en
+/// puntos. Los sealed de Kotlin llegan como OrdenDibujoRect, OrdenDibujoLinea…
+struct LienzoView: View {
+    let lienzo: GoElementoLienzo
+
+    var body: some View {
+        Canvas { ctx, size in
+            for orden in (lienzo.ordenes as? [OrdenDibujo] ?? []) {
+                dibujar(orden, en: &ctx, tamano: size)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: CGFloat(lienzo.alto))
+    }
+
+    private func dibujar(_ orden: OrdenDibujo, en ctx: inout GraphicsContext, tamano: CGSize) {
+        if let r = orden as? OrdenDibujoRect {
+            let rect = CGRect(
+                x: r.x * tamano.width,
+                y: r.y * tamano.height,
+                width: r.ancho * tamano.width,
+                height: r.alto * tamano.height
+            )
+            let ruta = Path(roundedRect: rect, cornerRadius: CGFloat(r.esquinas))
+            if r.relleno {
+                ctx.fill(ruta, with: .color(color(r.color)))
+            } else {
+                ctx.stroke(ruta, with: .color(color(r.color)), lineWidth: 1)
+            }
+
+        } else if let c = orden as? OrdenDibujoCirculo {
+            let centro = CGPoint(x: c.x * tamano.width, y: c.y * tamano.height)
+            let rect = CGRect(
+                x: centro.x - CGFloat(c.radio), y: centro.y - CGFloat(c.radio),
+                width: CGFloat(c.radio) * 2, height: CGFloat(c.radio) * 2
+            )
+            let ruta = Path(ellipseIn: rect)
+            if c.relleno {
+                ctx.fill(ruta, with: .color(color(c.color)))
+            } else {
+                ctx.stroke(ruta, with: .color(color(c.color)), lineWidth: 1)
+            }
+
+        } else if let l = orden as? OrdenDibujoLinea {
+            let puntos = (l.puntos as? [Punto] ?? []).map {
+                CGPoint(x: $0.x * tamano.width, y: $0.y * tamano.height)
+            }
+            guard puntos.count > 1 else { return }
+            var ruta = Path()
+            ruta.move(to: puntos[0])
+            for p in puntos.dropFirst() { ruta.addLine(to: p) }
+            ctx.stroke(ruta, with: .color(color(l.color)), lineWidth: CGFloat(l.grosor))
+
+        } else if let t = orden as? OrdenDibujoRotulo {
+            let texto = Text(t.texto)
+                .font(.system(size: CGFloat(t.tamano)))
+                .foregroundColor(color(t.color))
+            ctx.draw(texto, at: CGPoint(x: t.x * tamano.width, y: t.y * tamano.height))
+        }
+    }
+
+    /// "#RRGGBB" o "#RRGGBBAA" → Color. Un hex roto se pinta gris, no revienta.
+    private func color(_ hex: String) -> Color {
+        var s = hex.trimmingCharacters(in: .whitespaces)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6 || s.count == 8, let v = UInt64(s, radix: 16) else {
+            return .gray
+        }
+        let tieneAlfa = s.count == 8
+        let r = Double((v >> (tieneAlfa ? 24 : 16)) & 0xFF) / 255
+        let g = Double((v >> (tieneAlfa ? 16 : 8)) & 0xFF) / 255
+        let b = Double((v >> (tieneAlfa ? 8 : 0)) & 0xFF) / 255
+        let a = tieneAlfa ? Double(v & 0xFF) / 255 : 1
+        return Color(red: r, green: g, blue: b, opacity: a)
     }
 }

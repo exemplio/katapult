@@ -75,6 +75,7 @@ private fun lineas(e: GoElemento, sangria: String): List<String> = when (e) {
     is GoElemento.Deslizador -> listOf("$sangria├─ ${e.valor} ─┤ [${e.minimo}..${e.maximo}]")
     is GoElemento.Imagen -> listOf("$sangria🖼  ${e.url.substringAfterLast('/')}")
     is GoElemento.Progreso -> listOf(sangria + (e.valor?.let { "▓".repeat((it * 10).toInt()) + "░".repeat(10 - (it * 10).toInt()) } ?: "◌ …"))
+    is GoElemento.Lienzo -> listOf("$sangria🎨 lienzo ${e.alto}pt · ${e.ordenes.size} órdenes")
     is GoElemento.Separador -> listOf("$sangria────────")
     is GoElemento.Espacio -> listOf("")
     is GoElemento.Columna -> e.hijos.flatMap { lineas(it, sangria) }

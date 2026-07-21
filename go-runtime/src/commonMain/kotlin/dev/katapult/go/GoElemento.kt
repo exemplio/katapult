@@ -79,6 +79,23 @@ sealed interface GoElemento {
     @SerialName("progreso")
     data class Progreso(val valor: Double? = null) : GoElemento
 
+    /**
+     * La válvula de escape visual: dibujo libre interpretado sobre un Canvas
+     * NATIVO (Core Graphics). La pieza es fija; las órdenes viajan — gráficos,
+     * medidores, iconografía propia, sin release y sin web.
+     *
+     * Coordenadas fraccionales (0..1 del ancho/alto real): los dibujos se
+     * adaptan solos a cualquier pantalla. Radios, grosores y tamaños de letra
+     * van en puntos absolutos.
+     */
+    @Serializable
+    @SerialName("lienzo")
+    data class Lienzo(
+        /** Alto del lienzo en puntos; el ancho es todo el disponible. */
+        val alto: Int,
+        val ordenes: List<OrdenDibujo>,
+    ) : GoElemento
+
     @Serializable
     @SerialName("separador")
     data object Separador : GoElemento
@@ -120,6 +137,56 @@ sealed interface GoElemento {
         val hijos: List<GoElemento>,
     ) : GoElemento
 }
+
+/** Una orden de dibujo del [GoElemento.Lienzo]. Colores en hex "#RRGGBB" o "#RRGGBBAA". */
+@Serializable
+sealed interface OrdenDibujo {
+
+    @Serializable
+    @SerialName("rect")
+    data class Rect(
+        val x: Double, val y: Double,
+        val ancho: Double, val alto: Double,
+        val color: String = "#FFFFFF",
+        val relleno: Boolean = true,
+        /** Radio de esquinas, en puntos. */
+        val esquinas: Double = 0.0,
+    ) : OrdenDibujo
+
+    @Serializable
+    @SerialName("circulo")
+    data class Circulo(
+        val x: Double, val y: Double,
+        /** En puntos. */
+        val radio: Double,
+        val color: String = "#FFFFFF",
+        val relleno: Boolean = true,
+    ) : OrdenDibujo
+
+    /** Polilínea que une [puntos] en orden. */
+    @Serializable
+    @SerialName("linea")
+    data class Linea(
+        val puntos: List<Punto>,
+        val color: String = "#FFFFFF",
+        /** En puntos. */
+        val grosor: Double = 2.0,
+    ) : OrdenDibujo
+
+    /** Texto centrado en (x, y). */
+    @Serializable
+    @SerialName("rotulo")
+    data class Rotulo(
+        val x: Double, val y: Double,
+        val texto: String,
+        /** En puntos. */
+        val tamano: Double = 12.0,
+        val color: String = "#FFFFFF",
+    ) : OrdenDibujo
+}
+
+@Serializable
+data class Punto(val x: Double, val y: Double)
 
 @Serializable
 enum class EstiloTexto { TITULO, SUBTITULO, CUERPO, PIE }

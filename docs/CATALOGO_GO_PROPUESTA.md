@@ -38,6 +38,7 @@ ejecuta Compose de verdad. Los dos modos se reparten el trabajo.
 | `Deslizador` | id, valor, minimo=0, maximo=1 | `(id, valor.toString())` | `Slider` |
 | `Imagen` | url, alto? | — | `AsyncImage` (descarga el ANFITRIÓN; QuickJS no tiene red) |
 | `Progreso` | valor? (null = indeterminado) | — | `ProgressView` |
+| `Lienzo` | alto, ordenes (Rect/Circulo/Linea/Rotulo, coords 0..1, hex) | — | `Canvas` nativo — la válvula de escape visual: gráficos y widgets custom SIN release y SIN web |
 | `Separador` | — | — | `Divider` |
 | `Espacio` | alto=8 | — | `Spacer().frame(height:)` |
 
