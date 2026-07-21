@@ -28,24 +28,45 @@ struct RootView: View {
     @State private var screen: Screen = .connect
 
     var body: some View {
-        switch screen {
-        case .connect:
-            ConnectView { url, mode in
-                switch mode {
-                case .espejo: screen = .espejo(url)
-                case .go: screen = .go(url)
+        Group {
+            switch screen {
+            case .connect:
+                ConnectView { url, mode in
+                    switch mode {
+                    case .espejo: screen = .espejo(url)
+                    case .go: screen = .go(url)
+                    }
+                }
+            case .espejo(let url):
+                AppHostView(url: url) {
+                    screen = .connect
+                }
+                // El webview ocupa toda la pantalla, incluida la zona bajo la barra.
+                .ignoresSafeArea(edges: .bottom)
+            case .go(let url):
+                GoHostView(manifestURL: url) {
+                    screen = .connect
                 }
             }
-        case .espejo(let url):
-            AppHostView(url: url) {
-                screen = .connect
-            }
-            // El webview ocupa toda la pantalla, incluida la zona bajo la barra.
-            .ignoresSafeArea(edges: .bottom)
-        case .go(let url):
-            GoHostView(manifestURL: url) {
-                screen = .connect
-            }
+        }
+        .onOpenURL(perform: abrir)
+    }
+
+    /// El deep link del QR que imprime el dev server en la terminal:
+    /// `katapult://espejo?url=…` o `katapult://go?url=…`. Lo escanea la cámara
+    /// del sistema — sin código de cámara en la app, como el exp:// de Expo.
+    private func abrir(_ url: URL) {
+        guard url.scheme == "katapult",
+              let destino = url.host,
+              let componentes = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let objetivo = componentes.queryItems?.first(where: { $0.name == "url" })?.value,
+              let objetivoURL = URL(string: objetivo)
+        else { return }
+
+        switch destino {
+        case "espejo": screen = .espejo(objetivoURL)
+        case "go": screen = .go(objetivoURL)
+        default: break
         }
     }
 }

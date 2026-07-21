@@ -34,12 +34,20 @@ interpretado (permitido por Apple); la UI vive fija en el binario.
 Dos terminales, **en orden** (ver "Trampas" sobre el lock de Gradle):
 
 ```bash
-# 1. Servidor de módulos: compila jsMain en continuo y sirve en :8081
-./gradlew :go-runtime:serveDevelopmentZipline --continuous
+# 1. Servidor de módulos: sirve en :8081, se anuncia por mDNS e imprime QR
+./gradlew :go-runtime:goServe
 
 # 2. Anfitrión: descarga la lógica, la ejecuta en QuickJS, re-renderiza cada segundo
 ./gradlew :go-runtime:goHost
+
+# Para recompilar la lógica al guardar, en una tercera terminal (o en vez de
+# goServe si no necesitas anuncio: serveDevelopmentZipline hace ambas cosas):
+./gradlew :go-runtime:compileDevelopmentExecutableKotlinJsZipline --continuous
 ```
+
+`goServe` es nuestro (Ktor estático + JmDNS + QR); `serveDevelopmentZipline`
+es la tarea de Zipline: compila en continuo y sirve, pero no se anuncia. Ambas
+usan el puerto 8081 — una o la otra, no las dos.
 
 Con ambos corriendo, edita algo visible en
 `go-runtime/src/jsMain/kotlin/dev/katapult/go/LogicaJs.kt` y guarda: el
@@ -97,6 +105,26 @@ Para probarlo en el iPhone: disparar el workflow `Katapult Go (unsigned)`
 (gasta minutos de Actions), `katapult sign` + `install`, y en la app elegir
 modo Go con `ip-del-pc:8081` (la app completa `/manifest.zipline.json` sola).
 En el iPhone `localhost` no vale: es la IP LAN del PC.
+
+## Descubrimiento de servidores (como Expo Go)
+
+Katapult-go ya no exige teclear la IP; hay tres caminos, de más a menos cómodo:
+
+1. **Lista automática (mDNS/Bonjour).** El espejo y `goServe` se anuncian como
+   `_katapult._tcp` en la LAN (JmDNS, `Anuncio.kt` en mirror-runtime) con el
+   modo en el TXT record. La app los busca con `NWBrowser`
+   (`Descubridor.swift`) y los lista en la pantalla de conexión; tocar uno
+   resuelve el nombre a IP y conecta con el modo correcto.
+2. **QR.** El dev server imprime en la terminal un QR con el deep link
+   `katapult://espejo?url=…` o `katapult://go?url=…`. Se escanea con la cámara
+   del sistema (esquema registrado en Info.plist) — sin código de cámara en la
+   app, igual que el `exp://` de Expo.
+3. **IP a mano.** El campo de siempre, como respaldo: en redes que bloquean
+   multicast (invitados, VPNs) el mDNS no ve nada y el QR/IP siguen valiendo.
+
+Trampas de iOS ya contempladas: `NSBonjourServices` en Info.plist es
+obligatorio (sin él, el descubrimiento falla EN SILENCIO) y ya estaba
+`NSLocalNetworkUsageDescription` del espejo.
 
 ## Siguiente decisión (la cara)
 

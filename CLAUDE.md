@@ -33,6 +33,9 @@ cli/              CLI con Clikt. Comandos: init, build, sign, install,
                   doctor, setup, publish, ota
 mirror-runtime/   Servidor del espejo: render Compose en JVM + H.264 + WebSocket
 gradle-plugin/    Cablea el espejo en un proyecto KMP (id "dev.katapult.mirror")
+                  El espejo y goServe se anuncian por mDNS (_katapult._tcp,
+                  Anuncio.kt) e imprimen QR con deep links katapult://; la app
+                  los descubre con NWBrowser (Descubridor.swift)
 go-runtime/       Fase 3: lógica dinámica con Zipline. commonMain = contrato,
                   jsMain = lógica que viaja, hostMain = anfitrión compartido,
                   jvmMain = consola Linux, iosArm64Main = GoAnfitrion para Swift
@@ -107,8 +110,12 @@ Coste por frame en el EDT: render 2,0 ms + copia 0,7 ms + lectura 1,9 ms.
 
 # Katapult Go paso 0 (lógica dinámica Zipline) — dos terminales, EN ORDEN
 # (lanzarlos a la vez en frío choca con el lock de Gradle)
-./gradlew :go-runtime:serveDevelopmentZipline --continuous   # sirve en :8081
+./gradlew :go-runtime:goServe                                # sirve en :8081 + mDNS + QR
 ./gradlew :go-runtime:goHost                                 # anfitrión JVM
+# recompilar la lógica al guardar (tercera terminal):
+./gradlew :go-runtime:compileDevelopmentExecutableKotlinJsZipline --continuous
+# alternativa sin anuncio mDNS que compila Y sirve (no junto con goServe: mismo puerto):
+./gradlew :go-runtime:serveDevelopmentZipline --continuous
 
 # Verificar el código iOS desde Linux (solo klib; el framework lo enlaza CI)
 ./gradlew :go-runtime:compileKotlinIosArm64

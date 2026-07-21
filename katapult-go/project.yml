@@ -52,3 +52,16 @@ targets:
         NSLocalNetworkUsageDescription: >-
           Katapult Go se conecta al servidor de desarrollo que corre en tu
           computadora para cargar tu app.
+
+        # Sin declarar el tipo de servicio, iOS silencia el descubrimiento
+        # Bonjour sin dar NINGÚN error. Tiene que casar con TIPO_SERVICIO_MDNS
+        # de Anuncio.kt.
+        NSBonjourServices:
+          - _katapult._tcp
+
+        # El esquema del deep link que imprimen los QR del dev server
+        # (katapult://espejo?url=… / katapult://go?url=…).
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.katapult.go
+            CFBundleURLSchemes:
+              - katapult

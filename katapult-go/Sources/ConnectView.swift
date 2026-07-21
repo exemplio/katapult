@@ -20,6 +20,12 @@ struct ConnectView: View {
     @State private var error: String?
     @FocusState private var focused: Bool
 
+    // Descubrimiento mDNS: los servidores de la LAN aparecen solos, como en
+    // Expo Go. El campo de IP manual queda como respaldo (multicast bloqueado,
+    // VPNs, redes de invitados…).
+    @StateObject private var descubridor = Descubridor()
+    @State private var resolviendo: String?
+
     private var mode: ConnectMode { ConnectMode(rawValue: modeRaw) ?? .espejo }
 
     var body: some View {
@@ -75,6 +81,40 @@ struct ConnectView: View {
             .disabled(host.trimmingCharacters(in: .whitespaces).isEmpty)
             .padding(.horizontal)
 
+            if !descubridor.servidores.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("En tu red")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(descubridor.servidores) { servidor in
+                        Button {
+                            conectarA(servidor)
+                        } label: {
+                            HStack {
+                                Image(systemName: servidor.modo == .espejo
+                                    ? "rectangle.on.rectangle"
+                                    : "bolt.fill")
+                                VStack(alignment: .leading) {
+                                    Text(servidor.nombre)
+                                        .lineLimit(1)
+                                    Text(servidor.modo == .espejo ? "Espejo" : "Go (Zipline)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if resolviendo == servidor.id {
+                                    ProgressView()
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .padding(.horizontal)
+            }
+
             Spacer()
 
             Text("Arranca el dev server en tu máquina y escribe aquí su IP y puerto.")
@@ -84,7 +124,27 @@ struct ConnectView: View {
                 .padding(.horizontal, 32)
                 .padding(.bottom)
         }
-        .onAppear { focused = host.isEmpty }
+        .onAppear {
+            focused = host.isEmpty
+            descubridor.iniciar()
+        }
+        .onDisappear { descubridor.detener() }
+    }
+
+    /// Conecta a un servidor descubierto: resuelve el nombre Bonjour a IP real
+    /// y entra directamente con el modo que anunció el servidor.
+    private func conectarA(_ servidor: ServidorEncontrado) {
+        guard resolviendo == nil else { return }
+        error = nil
+        resolviendo = servidor.id
+        descubridor.resolver(servidor) { url in
+            resolviendo = nil
+            guard let url else {
+                error = "No se pudo resolver \(servidor.nombre)"
+                return
+            }
+            onConnect(url, servidor.modo)
+        }
     }
 
     private func connect() {

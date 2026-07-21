@@ -37,6 +37,14 @@ fun startMirror(
         content = content,
     ).start()
 
+    // Descubrible desde katapult-go sin teclear la IP, como en Expo Go.
+    anunciarServicio(modo = "espejo", puerto = port)
+    ipLan()?.let { ip ->
+        val url = "http://${ip.hostAddress}:$port"
+        println("→ En el iPhone: elige el servidor en Katapult Go, o escanea:")
+        imprimirQrAcceso(modo = "espejo", url = url)
+    }
+
     // El servidor y el bucle de render viven en sus propios hilos.
     Thread.currentThread().join()
 }

@@ -31,6 +31,11 @@ dependencies {
     implementation("io.ktor:ktor-server-core:3.4.3")
     implementation("io.ktor:ktor-server-netty:3.4.3")
     implementation("io.ktor:ktor-server-websockets:3.4.3")
+
+    // Descubrimiento tipo Expo Go: anuncio mDNS/Bonjour + QR con deep link.
+    // api: go-runtime reutiliza Anuncio.kt para su propio servidor.
+    api("org.jmdns:jmdns:3.6.3")
+    api("io.nayuki:qrcodegen:1.8.0")
 }
 
 kotlin {

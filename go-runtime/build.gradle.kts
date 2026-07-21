@@ -54,6 +54,11 @@ kotlin {
             dependsOn(hostMain)
             dependencies {
                 implementation("com.squareup.okhttp3:okhttp:5.1.0")
+                // Anuncio mDNS + QR (Anuncio.kt). Arrastra las deps de Compose
+                // del espejo, que aquí sobran pero no estorban.
+                implementation(project(":mirror-runtime"))
+                implementation("io.ktor:ktor-server-core:3.4.3")
+                implementation("io.ktor:ktor-server-netty:3.4.3")
             }
         }
         // iosArm64Main directamente: con un único target iOS no hay jerarquía
@@ -86,4 +91,15 @@ tasks.register<JavaExec>("goHost") {
     dependsOn(jvmCompilation.compileTaskProvider)
     mainClass.set("dev.katapult.go.HostKt")
     classpath(jvmCompilation.output.allOutputs, project.provider { jvmCompilation.runtimeDependencyFiles })
+}
+
+tasks.register<JavaExec>("goServe") {
+    group = "katapult"
+    description = "Sirve los módulos Zipline en :8081 y anuncia el servidor por mDNS (con QR)."
+    // Compila la lógica una vez; para recompilar al guardar, corre en paralelo
+    // compileDevelopmentExecutableKotlinJsZipline --continuous.
+    dependsOn(jvmCompilation.compileTaskProvider, "compileDevelopmentExecutableKotlinJsZipline")
+    mainClass.set("dev.katapult.go.ServidorGoKt")
+    classpath(jvmCompilation.output.allOutputs, project.provider { jvmCompilation.runtimeDependencyFiles })
+    args(layout.buildDirectory.dir("zipline/Development").get().asFile.absolutePath, "8081")
 }
