@@ -14,10 +14,14 @@ struct KatapultGoApp: App {
     }
 }
 
-/// Estado de la sesión: o estás eligiendo servidor, o estás dentro de la app.
+/// Estado de la sesión: eligiendo servidor, o dentro de la app por uno de los
+/// dos modos de render.
 enum Screen {
     case connect
-    case running(URL)
+    /// Espejo: la app corre en el PC y aquí llegan píxeles (WKWebView).
+    case espejo(URL)
+    /// Go: la lógica corre AQUÍ, descargada como bytecode QuickJS (Zipline).
+    case go(URL)
 }
 
 struct RootView: View {
@@ -26,15 +30,22 @@ struct RootView: View {
     var body: some View {
         switch screen {
         case .connect:
-            ConnectView { url in
-                screen = .running(url)
+            ConnectView { url, mode in
+                switch mode {
+                case .espejo: screen = .espejo(url)
+                case .go: screen = .go(url)
+                }
             }
-        case .running(let url):
+        case .espejo(let url):
             AppHostView(url: url) {
                 screen = .connect
             }
             // El webview ocupa toda la pantalla, incluida la zona bajo la barra.
             .ignoresSafeArea(edges: .bottom)
+        case .go(let url):
+            GoHostView(manifestURL: url) {
+                screen = .connect
+            }
         }
     }
 }

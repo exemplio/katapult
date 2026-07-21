@@ -4,12 +4,23 @@ import SwiftUI
 ///
 /// Recuerda el último servidor usado, porque en desarrollo se reconecta al mismo
 /// una y otra vez.
+/// Los dos modos de render de Katapult Go.
+enum ConnectMode: String {
+    /// La app corre en el PC; llegan píxeles por WebSocket (puerto 8080).
+    case espejo
+    /// La lógica corre aquí, descargada con Zipline (puerto 8081).
+    case go
+}
+
 struct ConnectView: View {
-    var onConnect: (URL) -> Void
+    var onConnect: (URL, ConnectMode) -> Void
 
     @AppStorage("katapult.lastHost") private var host: String = ""
+    @AppStorage("katapult.lastMode") private var modeRaw: String = ConnectMode.espejo.rawValue
     @State private var error: String?
     @FocusState private var focused: Bool
+
+    private var mode: ConnectMode { ConnectMode(rawValue: modeRaw) ?? .espejo }
 
     var body: some View {
         VStack(spacing: 24) {
@@ -23,12 +34,21 @@ struct ConnectView: View {
                     .foregroundStyle(.secondary)
             }
 
+            // El modo cambia qué servidor se espera al otro lado: el espejo
+            // (píxeles) o el servidor de módulos Zipline (bytecode).
+            Picker("Modo", selection: $modeRaw) {
+                Text("Espejo").tag(ConnectMode.espejo.rawValue)
+                Text("Go (Zipline)").tag(ConnectMode.go.rawValue)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+
             VStack(alignment: .leading, spacing: 8) {
                 Text("Servidor de desarrollo")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                TextField("192.168.0.10:8090", text: $host)
+                TextField(mode == .espejo ? "192.168.0.10:8080" : "192.168.0.10:8081", text: $host)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(.body, design: .monospaced))
                     .keyboardType(.URL)
@@ -69,12 +89,26 @@ struct ConnectView: View {
 
     private func connect() {
         error = nil
-        guard let url = normalized(host) else {
-            error = "No entiendo esa dirección. Ejemplo: 192.168.0.10:8090"
+        guard var url = normalized(host) else {
+            error = "No entiendo esa dirección. Ejemplo: 192.168.0.10:8080"
             return
         }
         host = url.absoluteString
-        onConnect(url)
+        if mode == .go {
+            // El loader de Zipline quiere la URL del manifest, pero al usuario
+            // le basta con escribir ip:puerto — completamos el resto aquí.
+            url = manifestURL(from: url)
+        }
+        onConnect(url, mode)
+    }
+
+    /// "http://ip:8081" → "http://ip:8081/manifest.zipline.json" (respetando
+    /// una ruta explícita si el usuario ya escribió una).
+    private func manifestURL(from url: URL) -> URL {
+        if url.path.isEmpty || url.path == "/" {
+            return url.appendingPathComponent("manifest.zipline.json")
+        }
+        return url
     }
 
     /// Acepta "192.168.0.10:8090", "http://…" o un host suelto y devuelve una URL válida.

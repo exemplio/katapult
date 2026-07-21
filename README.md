@@ -84,8 +84,14 @@ compila el IPA nativo.
 - [x] **CLI de builds** — init/build/sign/install/doctor/setup/publish
 - [x] **Espejo de desarrollo** — Compose en JVM, H.264 + WebCodecs, 60 fps,
       toques y gestos de vuelta
-- [ ] **Katapult Go** — hoy es un WKWebView del cliente web, así que no aporta
-      sobre Safari. Solo lo hará cuando decodifique en nativo con VideoToolbox
+- [x] **Lógica dinámica, paso 0 (JVM)** — código Kotlin que se descarga y
+      recarga en caliente con [Zipline](https://github.com/cashapp/zipline);
+      ver [docs/KATAPULT_GO_PASO_0.md](docs/KATAPULT_GO_PASO_0.md)
+- [ ] **Katapult Go** — ya tiene dos modos de conexión: **Espejo** (WKWebView
+      del cliente web; decodificar nativo con VideoToolbox sigue pendiente) y
+      **Go** (anfitrión Zipline vía `GoRuntime.framework`: la lógica corre en
+      el dispositivo y se recarga en caliente). Falta compilar el IPA en CI
+      y probarlo en un iPhone real
 - [ ] Publicar el plugin en el portal de Gradle (ahora se resuelve por `mavenLocal`)
 
 ## Lo que Katapult no va a ser
@@ -100,7 +106,12 @@ llegó a producción, y **discontinuaron Redwood en enero de 2026**. El análisi
 completo, con las alternativas y sus costes, está en
 [docs/OPCION_D_EXPO_GO_PARA_COMPOSE.md](docs/OPCION_D_EXPO_GO_PARA_COMPOSE.md).
 
-En su lugar, el reparto que sí funciona hoy:
+Lo que sí se está haciendo, **poco a poco y sin comprometer lo anterior**, es
+la parte de esa arquitectura que Expo Go también tiene: lógica interpretada que
+viaja, UI fija que no. El paso 0 ya funciona en JVM
+([docs/KATAPULT_GO_PASO_0.md](docs/KATAPULT_GO_PASO_0.md)).
+
+Mientras tanto, el reparto del día a día:
 
 | | Para qué | Ciclo |
 |---|---|---|

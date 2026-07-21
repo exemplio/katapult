@@ -33,7 +33,11 @@ cli/              CLI con Clikt. Comandos: init, build, sign, install,
                   doctor, setup, publish, ota
 mirror-runtime/   Servidor del espejo: render Compose en JVM + H.264 + WebSocket
 gradle-plugin/    Cablea el espejo en un proyecto KMP (id "dev.katapult.mirror")
-katapult-go/      App iOS en Swift (XcodeGen). Hoy es un WKWebView del cliente web
+go-runtime/       Fase 3: lógica dinámica con Zipline. commonMain = contrato,
+                  jsMain = lógica que viaja, hostMain = anfitrión compartido,
+                  jvmMain = consola Linux, iosArm64Main = GoAnfitrion para Swift
+katapult-go/      App iOS en Swift (XcodeGen). Dos modos: Espejo (WKWebView del
+                  cliente web) y Go (Zipline, vía GoRuntime.framework)
 docs/             Referencias de decisiones. Ver OPCION_D_*.md
 ```
 
@@ -47,12 +51,19 @@ cualquier proyecto + rendimiento nativo. Apple permite código interpretado pero
 prohíbe descargar y ejecutar código **nativo**, y Compose compila su UI a código
 máquina. Expo Go puede porque en React Native la UI se declara en JS.
 
-Esto se investigó a fondo y **está zanjado**. Antes de proponer un "Expo Go para
-Compose", lee [docs/OPCION_D_EXPO_GO_PARA_COMPOSE.md](docs/OPCION_D_EXPO_GO_PARA_COMPOSE.md).
+Esto se investigó a fondo: antes de tocar nada de "Expo Go para Compose", lee
+[docs/OPCION_D_EXPO_GO_PARA_COMPOSE.md](docs/OPCION_D_EXPO_GO_PARA_COMPOSE.md).
 Resumen: la arquitectura viable es Redwood + Zipline (Treehouse), Cash App la
 construyó, y **discontinuó Redwood en enero de 2026** mientras sigue manteniendo
-Zipline. El README todavía menciona una "Fase 3 con Zipline" que quedó
-desmentida — **el README está desactualizado en ese punto**.
+Zipline.
+
+En julio de 2026 se decidió **retomar la vía Zipline poco a poco**, como modo
+adicional de katapult-go (el espejo queda intacto y sigue siendo la forma
+principal de iterar UI). El paso 0 —ciclo de despliegue con lógica dinámica y
+UI fija— ya funciona en JVM: módulo `:go-runtime`, ver
+[docs/KATAPULT_GO_PASO_0.md](docs/KATAPULT_GO_PASO_0.md). La línea roja sigue
+siendo la de la Opción D: si algún día hay catálogo de widgets, no pasar de
+~20 o se está reimplementando Compose.
 
 ## Números medidos (julio 2026)
 
@@ -93,6 +104,14 @@ Coste por frame en el EDT: render 2,0 ms + copia 0,7 ms + lectura 1,9 ms.
 
 # Publicar los módulos para que katapult-demo los resuelva
 ./gradlew :mirror-runtime:publishToMavenLocal :gradle-plugin:publishToMavenLocal
+
+# Katapult Go paso 0 (lógica dinámica Zipline) — dos terminales, EN ORDEN
+# (lanzarlos a la vez en frío choca con el lock de Gradle)
+./gradlew :go-runtime:serveDevelopmentZipline --continuous   # sirve en :8081
+./gradlew :go-runtime:goHost                                 # anfitrión JVM
+
+# Verificar el código iOS desde Linux (solo klib; el framework lo enlaza CI)
+./gradlew :go-runtime:compileKotlinIosArm64
 ```
 
 ## Arquitectura del espejo

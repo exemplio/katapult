@@ -18,6 +18,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # El modo Go embebe un framework Kotlin (anfitrión Zipline). Se enlaza
+      # aquí porque Kotlin/Native solo enlaza binarios de iOS en macOS.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Enlazar GoRuntime.framework (Kotlin)
+        working-directory: .  # el build de Gradle vive en la raíz del repo
+        run: ./gradlew :go-runtime:linkReleaseFrameworkIosArm64
+
       # XcodeGen convierte project.yml en un .xcodeproj real. Así no versionamos
       # el .pbxproj, que es ilegible y conflictivo.
       - name: Instalar XcodeGen
