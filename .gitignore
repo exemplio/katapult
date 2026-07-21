@@ -1,0 +1,8 @@
+.gradle/
+build/
+*.ipa
+*.p12
+*.mobileprovision
+.idea/
+*.iml
+local.properties

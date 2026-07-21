@@ -1,0 +1,74 @@
+# Generado por Katapult — compila un IPA iOS SIN FIRMAR para un proyecto
+# Kotlin Multiplatform. La firma se hace localmente con `katapult sign`.
+#
+# Basado en el flujo probado de geap-fit (Expo → generalizado a KMP).
+name: __APP_NAME__ iOS (unsigned)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-ios:
+    # La imagen define la versión de Xcode y por tanto el SDK de iOS. Compose
+    # Multiplatform 1.11+ necesita el SDK de iOS 26 (macos-26). Ajustable con
+    # "runnerImage" en katapult.json.
+    runs-on: __RUNNER_IMAGE__
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Cachea dependencias y el compilador Kotlin/Native (~1GB) entre builds
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Cache Kotlin/Native
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
+          restore-keys: ${{ runner.os }}-konan-
+
+      # CocoaPods solo si el proyecto lo usa (el wizard KMP puro no lo necesita)
+      - name: CocoaPods (si aplica)
+        run: |
+          if [ -f iosApp/Podfile ]; then
+            cd iosApp && pod install
+          fi
+
+      # Compila SIN firmar. Xcode invoca a Gradle para compilar el framework
+      # Kotlin/Native (embedAndSignAppleFrameworkForXcode) durante este paso.
+      - name: Compilar .app sin firmar
+        run: |
+          xcodebuild \
+            -project __XCODE_PROJECT__ \
+            -scheme __SCHEME__ \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Empaquetar en .ipa
+        run: |
+          APP_PATH=$(find build/DerivedData/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -1)
+          test -n "$APP_PATH" || { echo "No se encontró el .app"; exit 1; }
+          mkdir -p Payload
+          cp -r "$APP_PATH" Payload/
+          zip -qr "__APP_NAME__-unsigned.ipa" Payload
+
+      - name: Subir IPA como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: __ARTIFACT_NAME__
+          path: __APP_NAME__-unsigned.ipa
+          retention-days: 7
