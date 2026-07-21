@@ -48,7 +48,12 @@ docs/             Referencias de decisiones. Ver OPCION_D_*.md
 ```
 
 **Proyecto de pruebas: `~/katapult-demo`** (repo privado, plantilla KMP de
-JetBrains). Es donde se verifica todo de punta a punta.
+JetBrains). Es donde se verifica todo de punta a punta. Su módulo
+`:museo-logica` es el patrón de **lógica compartida**: las reglas (búsqueda,
+favoritas, recuentos) viven en un `MuseoStore` de Kotlin puro que consumen a
+la vez la app Compose (`:shared`, vía `MuseoEnlace`) y la lógica Go
+(`:logica-go`, que queda en puro mapeo estado → catálogo). Regla del store:
+nada de Compose/Ktor/corrutinas — tiene que correr también dentro de QuickJS.
 
 ## La restricción que define el proyecto
 
