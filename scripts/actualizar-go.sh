@@ -31,13 +31,13 @@ gh run download "$RUN" -n katapult-go-unsigned -D katapult-go/dist
 
 echo "→ Firmando…"
 ./gradlew :cli:installDist -q
-./build/install/katapult/bin/katapult sign --ipa katapult-go/dist/KatapultGo-unsigned.ipa
+./cli/build/install/katapult/bin/katapult sign --ipa katapult-go/dist/KatapultGo-unsigned.ipa
 
 if idevice_id -l 2>/dev/null | grep -q .; then
     echo "→ Instalando en el iPhone…"
-    ./build/install/katapult/bin/katapult install --ipa katapult-go/dist/KatapultGo-firmada.ipa
+    ./cli/build/install/katapult/bin/katapult install --ipa katapult-go/dist/KatapultGo-firmada.ipa
     echo "✓ Listo: abre Katapult Go en el iPhone."
 else
     echo "⚠  iPhone no conectado. Cuando lo conectes:"
-    echo "   ./build/install/katapult/bin/katapult install --ipa katapult-go/dist/KatapultGo-firmada.ipa"
+    echo "   ./cli/build/install/katapult/bin/katapult install --ipa katapult-go/dist/KatapultGo-firmada.ipa"
 fi

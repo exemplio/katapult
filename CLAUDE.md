@@ -107,7 +107,7 @@ Coste por frame en el EDT: render 2,0 ms + copia 0,7 ms + lectura 1,9 ms.
 ```bash
 # CLI
 ./gradlew :cli:installDist
-./build/install/katapult/bin/katapult doctor
+./cli/build/install/katapult/bin/katapult doctor
 
 # Espejo (desde el proyecto del usuario, p. ej. ~/katapult-demo)
 ./gradlew :shared:katapultMirror     # sirve en :8080, imprime líneas [perf]

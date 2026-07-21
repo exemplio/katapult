@@ -115,7 +115,7 @@ Compose de verdad. Diseño y criterio de crecimiento en
 
 ```bash
 ./gradlew installDist
-./build/install/katapult/bin/katapult doctor
+./cli/build/install/katapult/bin/katapult doctor
 ```
 
 ## Estado
