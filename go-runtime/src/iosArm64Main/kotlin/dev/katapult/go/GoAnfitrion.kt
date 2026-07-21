@@ -19,6 +19,7 @@ import platform.Foundation.NSURLSession
 class GoAnfitrion {
     private val scope = MainScope()
     private var trabajo: Job? = null
+    private val control = GoControl()
 
     fun arrancar(manifestUrl: String, alCambiar: (GoInforme) -> Unit) {
         detener()
@@ -29,12 +30,21 @@ class GoAnfitrion {
             manifestVerifier = NO_SIGNATURE_CHECKS,
             urlSession = NSURLSession.sharedSession,
         )
-        trabajo = arrancarGo(scope, dispatcher, loader, manifestUrl) { estado ->
+        trabajo = arrancarGo(scope, dispatcher, loader, manifestUrl, control) { estado ->
             when (estado) {
                 is GoEstado.Esperando -> alCambiar(GoInforme(null, 0, estado.detalle))
                 is GoEstado.Corriendo -> alCambiar(GoInforme(estado.pantalla, estado.version, null))
             }
         }
+    }
+
+    /**
+     * Un toque o un texto del usuario, de Swift hacia la lógica. Llamar desde
+     * el hilo principal (SwiftUI ya vive ahí); el repintado llega por el
+     * callback de [arrancar].
+     */
+    fun evento(id: String, valor: String?) {
+        control.evento(id, valor)
     }
 
     fun detener() {

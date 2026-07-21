@@ -6,18 +6,45 @@ import app.cash.zipline.Zipline
  * ESTE es el código que viaja: se compila a Kotlin/JS, el plugin de Zipline lo
  * convierte en bytecode de QuickJS (.zipline) y el anfitrión lo descarga.
  *
- * Edita cualquier cosa de esta clase con `serveDevelopmentZipline --continuous`
- * corriendo y el anfitrión la recarga solo, sin reinstalar nada.
+ * Con `./gradlew :go-runtime:goDev` corriendo, edita cualquier cosa de esta
+ * clase y guarda: el iPhone recarga solo, sin reinstalar nada.
  */
 class LogicaReal : GoLogica {
-    override fun pantalla(contador: Int) = GoPantalla(
-        titulo = "⚡ Recargado en caliente desde tu Linux",
-        lineas = listOf(
-            "Este código lo editó Ricardox mientras mirabas la pantalla.",
-            "Sin recompilar nativo, sin reinstalar, sin tocar el iPhone.",
-            "Ticks del anfitrión: $contador",
-        ),
+    // Estado de LA LÓGICA, no del anfitrión: vive aquí, en QuickJS, y se
+    // pierde en cada recarga (como el estado de JS en Expo Go).
+    private var nombre = ""
+    private var borrador = ""
+    private var contador = 0
+
+    override fun pantalla() = GoPantalla(
+        titulo = "Mini-app interactiva 🎛️",
+        elementos = buildList {
+            add(
+                GoElemento.Texto(
+                    if (nombre.isBlank()) "¿Cómo te llamas?" else "¡Hola, $nombre! 👋",
+                    destacado = true,
+                ),
+            )
+            add(GoElemento.Campo(id = "nombre", pista = "escribe tu nombre", valor = borrador))
+            add(GoElemento.Boton(id = "saludar", etiqueta = "Saludar"))
+            add(GoElemento.Texto("Contador: $contador"))
+            add(GoElemento.Boton(id = "sumar", etiqueta = "+1"))
+            add(GoElemento.Boton(id = "reiniciar", etiqueta = "Reiniciar"))
+        },
     )
+
+    override fun evento(id: String, valor: String?) {
+        when (id) {
+            "nombre" -> borrador = valor.orEmpty()
+            "saludar" -> nombre = borrador
+            "sumar" -> contador++
+            "reiniciar" -> {
+                contador = 0
+                nombre = ""
+                borrador = ""
+            }
+        }
+    }
 }
 
 // Sin @JsExport, Kotlin/JS IR no expone la función y QuickJS no puede invocarla:

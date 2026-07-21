@@ -83,11 +83,15 @@ El puerto es **8081** (el 8080 es del espejo, para poder correr ambos a la vez).
 ## Qué valida y qué NO valida este paso
 
 Valida: el ciclo completo de despliegue (compilar → servir → descargar →
-ejecutar → recargar) y que la fricción es baja.
+ejecutar → recargar), la fricción baja, y desde el mini-catálogo también la
+**interactividad**: la lógica declara la pantalla como datos
+(`GoElemento.Texto/Boton/Campo`), guarda su propio estado en QuickJS, y los
+toques/textos vuelven por `GoLogica.evento(id, valor)` → repintado inmediato.
 
-No valida: UI dinámica. La pantalla la pinta el anfitrión con código fijo; la
-lógica solo manda **datos** (`GoPantalla`). El catálogo de widgets es el paso 1
-y es el salto grande — releer la Opción D antes de darlo.
+No valida: el catálogo de verdad (paso 1). Tres elementos sin layout ni estilos
+no son Compose; son la maqueta del techo estructural: **elemento nuevo =
+release de la app**. Cambiar el contrato (`GoLogica.kt` en commonMain) exige
+recompilar IPA y lógica a la vez — todo lo demás es recarga en caliente.
 
 ## El anfitrión iOS (hecho, pendiente de compilar en CI)
 

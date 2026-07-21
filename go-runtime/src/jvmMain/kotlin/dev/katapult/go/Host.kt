@@ -42,12 +42,19 @@ fun main() {
     }
 }
 
+// La consola es un anfitrión de solo lectura: pinta los elementos pero no
+// manda eventos. La interacción de verdad se prueba en katapult-go.
 private fun render(pantalla: GoPantalla, version: Int) {
     val ancho = 64
     println("┌" + "─".repeat(ancho) + "┐")
     println("│ ${pantalla.titulo.padEnd(ancho - 2)} │")
     println("├" + "─".repeat(ancho) + "┤")
-    for (linea in pantalla.lineas) {
+    for (elemento in pantalla.elementos) {
+        val linea = when (elemento) {
+            is GoElemento.Texto -> if (elemento.destacado) "» ${elemento.texto}" else elemento.texto
+            is GoElemento.Boton -> "[ ${elemento.etiqueta} ]"
+            is GoElemento.Campo -> "${elemento.pista}: ${elemento.valor.ifEmpty { "_" }}"
+        }
         println("│ ${linea.padEnd(ancho - 2)} │")
     }
     println("└" + "─".repeat(ancho) + "┘  (lógica v$version)")
