@@ -160,7 +160,7 @@ private struct RepresentableEspejo: UIViewRepresentable {
         }
 
         func conectar(url: URL) {
-            decodificador?.detener()
+            Task { await decodificador?.detener() }
             decodificador = nil
             websocket?.cancel()
             mostrados = 0
