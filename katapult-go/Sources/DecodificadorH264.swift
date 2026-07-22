@@ -15,7 +15,7 @@ final class DecodificadorH264 {
 
     private var session: VTDecompressionSession?
     private var formatoDesc: CMVideoFormatDescription?
-    private var callback: ((CMSampleBuffer) -> Void)?
+    var callback: ((CMSampleBuffer) -> Void)?
     private var ancho: Int = 0
     private var alto: Int = 0
 
@@ -76,7 +76,7 @@ final class DecodificadorH264 {
     func decodificar(datos: Data) {
         guard let session, datos.count > 1 else { return }
 
-        let tipo = datos[0]
+        _ = datos[0]  // tipo: 1=keyframe, 0=delta
         let nalData = datos.subdata(in: 1..<datos.count)
 
         var blockBuffer: CMBlockBuffer?
