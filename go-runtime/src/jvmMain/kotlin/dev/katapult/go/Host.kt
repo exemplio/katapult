@@ -101,6 +101,7 @@ private fun lineas(e: GoElemento, sangria: String): List<String> = when (e) {
         listOf(sangria + prefijo + e.texto)
     }
     is GoElemento.Boton -> listOf("$sangria[ ${e.etiqueta}${if (e.habilitado) "" else " (off)"} ]")
+    is GoElemento.Enlace -> listOf(("$sangria${e.texto} ${e.enlace}").trim() + "  ⇢ toca:${e.id}")
     is GoElemento.Campo -> listOf("$sangria${e.pista}: ${if (e.seguro) "•".repeat(e.valor.length) else e.valor.ifEmpty { "_" }}")
     is GoElemento.Interruptor -> listOf("$sangria(${if (e.activo) "●" else "○"}) ${e.etiqueta}")
     is GoElemento.Deslizador -> listOf("$sangria├─ ${e.valor} ─┤ [${e.minimo}..${e.maximo}]")

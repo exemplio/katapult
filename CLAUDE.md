@@ -134,7 +134,7 @@ Coste por frame en el EDT: render 2,0 ms + copia 0,7 ms + lectura 1,9 ms.
 ./scripts/actualizar-go.sh
 ```
 
-El catálogo de widgets del modo Go (14 piezas, contenedores anidables) vive en
+El catálogo de widgets del modo Go (15 piezas, contenedores anidables) vive en
 go-runtime/…/GoElemento.kt + katapult-go/Sources/GoCatalogo.swift; diseño y
 criterio de crecimiento en docs/CATALOGO_GO_PROPUESTA.md. Añadir una pieza =
 cambio de contrato: publishToMavenLocal + IPA nuevo, y los campos nuevos

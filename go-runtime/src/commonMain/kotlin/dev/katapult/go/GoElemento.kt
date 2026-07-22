@@ -47,6 +47,25 @@ sealed interface GoElemento {
         val seguro: Boolean = false,
     ) : GoElemento
 
+    /**
+     * Texto tocable ("¿No tienes cuenta? *Crea una*"): la parte [enlace] va en
+     * negrita y dispara el evento. Distinto de [Boton] a propósito — media
+     * pantalla de login son enlaces, y pintarlos como botones queda tosco.
+     * OJO: pieza nueva (jul 2026) — las apps anteriores NO la deserializan;
+     * emitirla solo cuando el IPA instalado ya la soporte.
+     */
+    @Serializable
+    @SerialName("enlace")
+    data class Enlace(
+        val id: String,
+        /** Texto normal previo; puede ir vacío. */
+        val texto: String = "",
+        val enlace: String,
+        /** true = alineado al final (derecha); false = centrado. */
+        val alFinal: Boolean = false,
+        val habilitado: Boolean = true,
+    ) : GoElemento
+
     /** Manda "true"/"false" como valor del evento. */
     @Serializable
     @SerialName("interruptor")

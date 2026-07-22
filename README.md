@@ -70,7 +70,7 @@ compila el IPA nativo.
 El otro modo de la app **Katapult Go** (la misma que muestra el espejo). Tu
 lógica de Kotlin se compila a bytecode de QuickJS, viaja por WiFi y se ejecuta
 *en el dispositivo*; al guardar un archivo, el iPhone recarga solo, sin IPA de
-por medio. La pantalla se declara como un árbol de datos (`GoElemento`, 14
+por medio. La pantalla se declara como un árbol de datos (`GoElemento`, 15
 piezas: textos, botones, campos, imágenes, contenedores anidables, un `Lienzo`
 de órdenes de dibujo para gráficos custom…) que la app pinta con SwiftUI
 nativo — sin WebView.
@@ -128,7 +128,7 @@ no un sistema de estilos. Diseño y criterio de crecimiento en
 - [x] **Katapult Go** — probado en iPhone real, con sus dos modos: **Espejo**
       (cliente web en WKWebView) y **Go** (anfitrión Zipline vía
       `GoRuntime.framework`: lógica en el dispositivo, recarga en caliente,
-      catálogo de 14 piezas con `Lienzo` incluido). Descubrimiento de
+      catálogo de 15 piezas con `Lienzo` incluido). Descubrimiento de
       servidores por mDNS + QR con deep links `katapult://`.
       Cronología: [docs/KATAPULT_GO_PASO_0.md](docs/KATAPULT_GO_PASO_0.md)
 - [x] **Servicios de anfitrión: red** (`RedGo`) — el anfitrión hace las

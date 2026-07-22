@@ -25,6 +25,9 @@ struct ElementoView: View {
         } else if let boton = elemento as? GoElementoBoton {
             botonView(boton)
 
+        } else if let enlace = elemento as? GoElementoEnlace {
+            enlaceView(enlace)
+
         } else if let campo = elemento as? GoElementoCampo {
             campoView(campo)
 
@@ -120,14 +123,35 @@ struct ElementoView: View {
         let rol: ButtonRole? = boton.estilo == EstiloBoton.destructivo ? .destructive : nil
         Group {
             if boton.estilo == EstiloBoton.prominente {
-                Button(role: rol) { enviar(boton.id, nil) } label: { Text(boton.etiqueta) }
-                    .buttonStyle(.borderedProminent)
+                // CTA de verdad: todo el ancho y altura generosa, como el botón
+                // principal de cualquier formulario — no la pastilla del sistema.
+                Button(role: rol) { enviar(boton.id, nil) } label: {
+                    Text(boton.etiqueta)
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity, minHeight: 34)
+                }
+                .buttonStyle(.borderedProminent)
             } else {
-                Button(role: rol) { enviar(boton.id, nil) } label: { Text(boton.etiqueta) }
-                    .buttonStyle(.bordered)
+                Button(role: rol) { enviar(boton.id, nil) } label: {
+                    Text(boton.etiqueta).frame(maxWidth: .infinity, minHeight: 26)
+                }
+                .buttonStyle(.bordered)
             }
         }
         .disabled(!boton.habilitado)
+    }
+
+    /// "texto normal *enlace*" tocable; el enlace hereda el tinte del tema.
+    @ViewBuilder
+    private func enlaceView(_ e: GoElementoEnlace) -> some View {
+        Button { enviar(e.id, nil) } label: {
+            (Text(e.texto.isEmpty ? "" : e.texto + " ").foregroundColor(.secondary)
+                + Text(e.enlace).fontWeight(.bold).foregroundColor(.accentColor))
+                .font(.subheadline)
+        }
+        .buttonStyle(.plain)
+        .disabled(!e.habilitado)
+        .frame(maxWidth: .infinity, alignment: e.alFinal ? .trailing : .center)
     }
 
     @ViewBuilder
@@ -149,7 +173,11 @@ struct ElementoView: View {
                     .autocorrectionDisabled()
             }
         }
-        .textFieldStyle(.roundedBorder)
+        // Campo de formulario con presencia (14 pt de aire y esquina redondeada),
+        // sobre el fondo del sistema para contrastar con el fondo del tema.
+        .padding(14)
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(.separator)))
     }
 
     @ViewBuilder
