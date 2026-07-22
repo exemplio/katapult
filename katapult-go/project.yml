@@ -19,9 +19,10 @@ targets:
       - path: Assets.xcassets
     dependencies:
       # Framework Kotlin con el anfitrión Zipline (modo Go). Lo produce
-      # `./gradlew :go-runtime:linkReleaseFrameworkIosArm64` ANTES de xcodegen
+      # `./gradlew :go-runtime:linkDebugFrameworkIosArm64` ANTES de xcodegen
+      # (Debug a propósito: K/N en Release es lentísimo y esto es un dev client)
       # (en CI; el enlace necesita macOS). Es estático: no se embebe.
-      - framework: ../go-runtime/build/bin/iosArm64/releaseFramework/GoRuntime.framework
+      - framework: ../go-runtime/build/bin/iosArm64/debugFramework/GoRuntime.framework
         embed: false
     settings:
       base:

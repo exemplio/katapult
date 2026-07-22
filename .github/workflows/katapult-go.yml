@@ -25,9 +25,24 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # Cachés de Gradle (wrapper, dependencias, build cache): el 85% del
+      # tiempo del run era descargar esto desde cero cada vez.
+      - uses: gradle/actions/setup-gradle@v4
+
+      # El toolchain de Kotlin/Native (~1 GB en ~/.konan) solo cambia al subir
+      # de versión de Kotlin: al actualizarla, actualizar también esta clave.
+      - name: Caché del toolchain Kotlin/Native
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-konan-2.3.21
+
+      # Debug a propósito: es el dev client, y Kotlin/Native en Release hace
+      # optimización de programa completo (la lección medida de katapult-demo:
+      # el recorte grande del build vino de compilar en Debug).
       - name: Enlazar GoRuntime.framework (Kotlin)
         working-directory: .  # el build de Gradle vive en la raíz del repo
-        run: ./gradlew :go-runtime:linkReleaseFrameworkIosArm64
+        run: ./gradlew :go-runtime:linkDebugFrameworkIosArm64
 
       # XcodeGen convierte project.yml en un .xcodeproj real. Así no versionamos
       # el .pbxproj, que es ilegible y conflictivo.
