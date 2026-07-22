@@ -36,6 +36,15 @@ sealed interface GoElemento {
         val etiqueta: String,
         val estilo: EstiloBoton = EstiloBoton.NORMAL,
         val habilitado: Boolean = true,
+        /** Estilo libre del texto (tamano, peso, color…). null = el por defecto. */
+        val libre: EstiloLibre? = null,
+        /** Color de fondo en hex; null = el del estilo semántico. */
+        val fondo: String? = null,
+        /** Radio de esquinas, en puntos. null = el del estilo semántico. */
+        val esquinas: Double? = null,
+        /** Color del borde en hex; null = el del estilo semántico. */
+        val borde: String? = null,
+        val grosorBorde: Double? = null,
     ) : GoElemento
 
     @Serializable
@@ -47,6 +56,13 @@ sealed interface GoElemento {
         val teclado: Teclado = Teclado.TEXTO,
         /** true = contraseña: puntos en pantalla y sin autocorrección. */
         val seguro: Boolean = false,
+        /** Color de fondo en hex; null = systemBackground del sistema. */
+        val fondo: String? = null,
+        /** Radio de esquinas, en puntos. null = 12. */
+        val esquinas: Double? = null,
+        /** Color del borde en hex; null = separator del sistema. */
+        val borde: String? = null,
+        val grosorBorde: Double? = null,
     ) : GoElemento
 
     /**

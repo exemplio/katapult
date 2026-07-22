@@ -224,10 +224,38 @@ struct ElementoView: View {
     @ViewBuilder
     private func botonView(_ boton: GoElementoBoton) -> some View {
         let rol: ButtonRole? = boton.estilo == EstiloBoton.destructivo ? .destructive : nil
+        // Si la lógica mandó estilos custom (libre, fondo, esquinas…), se pinta
+        // como un botón plano con el aspecto exacto de la lógica — igual que
+        // Caja+Tocable+Texto pero con el estado disabled nativo de iOS.
+        let esCustom = boton.libre != nil || boton.fondo != nil
+            || boton.esquinas != nil || boton.borde != nil
         Group {
-            if boton.estilo == EstiloBoton.prominente {
-                // CTA de verdad: todo el ancho y altura generosa, como el botón
-                // principal de cualquier formulario — no la pastilla del sistema.
+            if esCustom {
+                Button(role: rol) { enviar(boton.id, nil) } label: {
+                    Text(boton.etiqueta)
+                        .font(fuenteCustom(boton.libre) ?? (boton.estilo == EstiloBoton.prominente ? .body.weight(.semibold) : .body))
+                        .fontWeight(pesoCustom(boton.libre) ?? (boton.estilo == EstiloBoton.prominente ? .semibold : nil))
+                        .foregroundStyle(colorTextoCustom(boton.libre) ?? colorTextoBoton(boton))
+                        .frame(maxWidth: .infinity, minHeight: boton.estilo == EstiloBoton.prominente ? 34 : 26)
+                }
+                .buttonStyle(.plain)
+                .padding(boton.estilo == EstiloBoton.prominente ? 10 : 6)
+                .frame(maxWidth: .infinity)
+                .background {
+                    if let fondo = boton.fondo {
+                        RoundedRectangle(cornerRadius: CGFloat(boton.esquinas ?? 8)).fill(colorGo(fondo))
+                    } else {
+                        RoundedRectangle(cornerRadius: CGFloat(boton.esquinas ?? 8))
+                            .fill(Color(.secondarySystemBackground))
+                    }
+                }
+                .overlay {
+                    if let borde = boton.borde {
+                        RoundedRectangle(cornerRadius: CGFloat(boton.esquinas ?? 8))
+                            .strokeBorder(colorGo(borde), lineWidth: CGFloat(boton.grosorBorde ?? 1))
+                    }
+                }
+            } else if boton.estilo == EstiloBoton.prominente {
                 Button(role: rol) { enviar(boton.id, nil) } label: {
                     Text(boton.etiqueta)
                         .fontWeight(.semibold)
@@ -242,6 +270,24 @@ struct ElementoView: View {
             }
         }
         .disabled(!boton.habilitado)
+    }
+
+    private func colorTextoBoton(_ boton: GoElementoBoton) -> Color {
+        if boton.estilo == EstiloBoton.destructivo { return .red }
+        if boton.estilo == EstiloBoton.prominente { return .white }
+        return .primary
+    }
+
+    private func fuenteCustom(_ libre: EstiloLibre?) -> Font? {
+        libre?.tamano.map { .system(size: CGFloat(truncating: $0)) }
+    }
+
+    private func pesoCustom(_ libre: EstiloLibre?) -> Font.Weight? {
+        peso(libre?.peso)
+    }
+
+    private func colorTextoCustom(_ libre: EstiloLibre?) -> Color? {
+        libre?.color.map(colorGo)
     }
 
     /// "texto normal *enlace*" tocable; el enlace hereda el tinte del tema.
@@ -276,11 +322,18 @@ struct ElementoView: View {
                     .autocorrectionDisabled()
             }
         }
-        // Campo de formulario con presencia (14 pt de aire y esquina redondeada),
-        // sobre el fondo del sistema para contrastar con el fondo del tema.
         .padding(14)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(.separator)))
+        .background(
+            (campo.fondo.map(colorGo) ?? Color(.systemBackground)),
+            in: RoundedRectangle(cornerRadius: CGFloat(campo.esquinas ?? 12))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: CGFloat(campo.esquinas ?? 12))
+                .strokeBorder(
+                    campo.borde.map(colorGo) ?? Color(.separator),
+                    lineWidth: CGFloat(campo.grosorBorde ?? 1)
+                )
+        )
     }
 
     @ViewBuilder
