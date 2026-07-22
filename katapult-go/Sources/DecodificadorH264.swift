@@ -108,9 +108,10 @@ final class DecodificadorH264 {
         )
         if status == kVTInvalidSessionErr {
             // La app volvió de background: la sesión de hardware muere y hay
-            // que recrearla con los mismos parámetros.
+            // que recrearla con los mismos parámetros. self. explícito: el
+            // guard de arriba sombreó la propiedad con una copia inmutable.
             self.session = nil
-            formatoDesc = nil
+            self.formatoDesc = nil
         }
     }
 
