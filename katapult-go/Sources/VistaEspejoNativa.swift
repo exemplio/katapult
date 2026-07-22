@@ -296,18 +296,27 @@ private struct RepresentableEspejo: UIViewRepresentable {
                     case .data(let data):
                         bytesRecibidos += data.count
                         if let texto = String(data: data, encoding: .utf8), texto.hasPrefix("{") {
-                            procesarTexto(texto, decoder: decoder)
+                            // Al MainActor SIEMPRE: procesarTexto toca UIKit
+                            // (becomeFirstResponder, frames) y este Task corre
+                            // en el pool cooperativo. Llamarlo desde aquí
+                            // crashea al enfocar un campo ("modifications to
+                            // the layout engine from a background thread").
+                            await MainActor.run { self.procesarTexto(texto, decoder: decoder) }
                         } else {
+                            // El video sí se decodifica fuera del main a
+                            // propósito; enqueue() del layer es thread-safe.
                             decoder.decodificar(datos: data)
                         }
                     case .string(let texto):
-                        procesarTexto(texto, decoder: decoder)
+                        await MainActor.run { self.procesarTexto(texto, decoder: decoder) }
                     @unknown default:
                         break
                     }
                     reportarMetricas()
                 } catch {
-                    if !cerrado { programarReconexion() }
+                    await MainActor.run {
+                        if !self.cerrado { self.programarReconexion() }
+                    }
                     return
                 }
             }
