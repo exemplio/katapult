@@ -4,10 +4,16 @@ import VideoToolbox
 
 /// Decodificador H.264 por hardware (VideoToolbox).
 ///
-/// Recibe datos en el formato del servidor: un byte de tipo (1 = keyframe,
-/// 0 = delta) seguido de NAL units Annex B. Las NAL units se pasan a un
-/// `VTDecompressionSession` que entrega `CMSampleBuffer` decodificados,
-/// listos para mostrar en un `AVSampleBufferDisplayLayer`.
+/// Recibe frames del servidor como [tipo: UInt8] + NAL units **Annex B**.
+/// VideoToolbox NO come Annex B, y falla en NEGRO sin dar error si se intenta.
+/// Hay que hacer dos conversiones, ambas aquí:
+///  1. Extraer SPS/PPS del stream (ffmpeg los mete en cada keyframe) y crear
+///     el CMVideoFormatDescription con CreateFromH264ParameterSets — crearlo
+///     "a pelo" con ancho×alto no configura el códec.
+///  2. Reempaquetar cada NAL en AVCC: longitud big-endian de 4 bytes en vez
+///     de start codes 00 00 01.
+/// La sesión se crea PEREZOSA al ver el primer keyframe, que es donde llegan
+/// los parámetros; si el stream los cambia, se recrea.
 ///
 /// No es actor: el callback C de VideoToolbox no soporta isolation de actor.
 /// Todo se llama desde el hilo principal.
@@ -16,41 +22,140 @@ final class DecodificadorH264 {
     private var session: VTDecompressionSession?
     private var formatoDesc: CMVideoFormatDescription?
     var callback: ((CMSampleBuffer) -> Void)?
-    private var ancho: Int = 0
-    private var alto: Int = 0
+    private var sps: Data?
+    private var pps: Data?
 
-    /// Configura el decodificador con las dimensiones del stream.
-    /// Debe llamarse UNA sola vez, tras recibir el "hello" del servidor.
+    /// Deja el decodificador listo. La sesión real se crea sola al llegar el
+    /// primer keyframe: sin los SPS/PPS del stream no hay nada que configurar.
     func iniciar(ancho: Int, alto: Int, fps: Int, onFrame: @escaping (CMSampleBuffer) -> Void) {
         detener()
-        self.ancho = ancho
-        self.alto = alto
-        self.callback = onFrame
+        callback = onFrame
+        print("[DecodificadorH264] esperando SPS/PPS del primer keyframe (\(ancho)×\(alto) @\(fps)fps)")
+    }
 
-        let status = CMVideoFormatDescriptionCreate(
-            allocator: kCFAllocatorDefault,
-            codecType: kCMVideoCodecType_H264,
-            width: Int32(ancho),
-            height: Int32(alto),
-            extensions: nil,
-            formatDescriptionOut: &formatoDesc
-        )
-        guard status == noErr, let desc = formatoDesc else {
-            print("[DecodificadorH264] CMVideoFormatDescriptionCreate falló: \(status)")
-            return
+    /// Un frame del servidor: [tipo: 1=keyframe, 0=delta] + NAL units Annex B.
+    func decodificar(datos: Data) {
+        guard datos.count > 5 else { return }
+
+        // Annex B → AVCC, cazando SPS/PPS por el camino.
+        var avcc = Data()
+        for nal in separarNALs(datos.subdata(in: 1..<datos.count)) {
+            guard let cabecera = nal.first else { continue }
+            switch cabecera & 0x1F {
+            case 7: if sps != nal { sps = nal; formatoDesc = nil }    // SPS
+            case 8: if pps != nal { pps = nal; formatoDesc = nil }    // PPS
+            case 6, 9: break                                          // SEI / AUD: ruido
+            default:                                                  // IDR (5), slice (1)…
+                var longitud = UInt32(nal.count).bigEndian
+                avcc.append(Data(bytes: &longitud, count: 4))
+                avcc.append(nal)
+            }
         }
 
-        // Callback a nivel de archivo (no closure): VideoToolbox exige
-        // un puntero a función C, sin captura de contexto. Pasamos self
-        // como refCon para resolver la instancia.
+        if formatoDesc == nil { crearSesion() }
+        guard let session, let formatoDesc, !avcc.isEmpty else { return }
+
+        var blockBuffer: CMBlockBuffer?
+        let bbStatus = CMBlockBufferCreateWithMemoryBlock(
+            allocator: kCFAllocatorDefault,
+            memoryBlock: nil,
+            blockLength: avcc.count,
+            blockAllocator: kCFAllocatorDefault,
+            customBlockSource: nil,
+            offsetToData: 0,
+            dataLength: avcc.count,
+            flags: 0,
+            blockBufferOut: &blockBuffer
+        )
+        guard bbStatus == noErr, let bb = blockBuffer else { return }
+        avcc.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
+            _ = CMBlockBufferReplaceDataBytes(
+                with: ptr.baseAddress!,
+                blockBuffer: bb,
+                offsetIntoDestination: 0,
+                dataLength: avcc.count
+            )
+        }
+
+        var tamanoMuestra = avcc.count
+        var sampleBuffer: CMSampleBuffer?
+        var timing = CMSampleTimingInfo(
+            duration: .invalid,
+            presentationTimeStamp: CMClockGetTime(CMClockGetHostTimeClock()),
+            decodeTimeStamp: .invalid
+        )
+        let sbStatus = CMSampleBufferCreateReady(
+            allocator: kCFAllocatorDefault,
+            dataBuffer: bb,
+            formatDescription: formatoDesc,
+            sampleCount: 1,
+            sampleTimingEntryCount: 1,
+            sampleTimingArray: &timing,
+            sampleSizeEntryCount: 1,
+            sampleSizeArray: &tamanoMuestra,
+            sampleBufferOut: &sampleBuffer
+        )
+        guard sbStatus == noErr, let sb = sampleBuffer else { return }
+
+        // Síncrono y sin procesado temporal: el stream es zerolatency (sin
+        // B-frames); pedir reordenación solo retiene frames y suma latencia.
+        let status = VTDecompressionSessionDecodeFrame(
+            session,
+            sampleBuffer: sb,
+            flags: [],
+            frameRefcon: nil,
+            infoFlagsOut: nil
+        )
+        if status == kVTInvalidSessionErr {
+            // La app volvió de background: la sesión de hardware muere y hay
+            // que recrearla con los mismos parámetros.
+            self.session = nil
+            formatoDesc = nil
+        }
+    }
+
+    /// CMVideoFormatDescription desde los SPS/PPS reales + sesión nueva.
+    private func crearSesion() {
+        guard let sps, let pps else { return }
+
+        var desc: CMVideoFormatDescription?
+        let status: OSStatus = sps.withUnsafeBytes { spsBuf in
+            pps.withUnsafeBytes { ppsBuf in
+                let punteros: [UnsafePointer<UInt8>] = [
+                    spsBuf.bindMemory(to: UInt8.self).baseAddress!,
+                    ppsBuf.bindMemory(to: UInt8.self).baseAddress!,
+                ]
+                let tamanos: [Int] = [sps.count, pps.count]
+                return CMVideoFormatDescriptionCreateFromH264ParameterSets(
+                    allocator: kCFAllocatorDefault,
+                    parameterSetCount: 2,
+                    parameterSetPointers: punteros,
+                    parameterSetSizes: tamanos,
+                    nalUnitHeaderLength: 4, // longitudes AVCC de 4 bytes, como arriba
+                    formatDescriptionOut: &desc
+                )
+            }
+        }
+        guard status == noErr, let desc else {
+            print("[DecodificadorH264] CreateFromH264ParameterSets falló: \(status)")
+            return
+        }
+        formatoDesc = desc
+
+        // Con formato nuevo, la sesión vieja no vale.
+        if let vieja = session {
+            VTDecompressionSessionInvalidate(vieja)
+            session = nil
+        }
+
+        // Callback a nivel de archivo (no closure): VideoToolbox exige un
+        // puntero a función C sin captura; self viaja como refCon.
         var cb = VTDecompressionOutputCallbackRecord()
         cb.decompressionOutputCallback = decodificadorCallback
         cb.decompressionOutputRefCon = Unmanaged.passUnretained(self).toOpaque()
 
         let attrs: [NSString: AnyObject] = [
             kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange as AnyObject,
-            kCVPixelBufferWidthKey: ancho as AnyObject,
-            kCVPixelBufferHeightKey: alto as AnyObject,
             kCVPixelBufferIOSurfacePropertiesKey: [:] as AnyObject,
         ]
 
@@ -67,72 +172,38 @@ final class DecodificadorH264 {
             print("[DecodificadorH264] VTDecompressionSessionCreate falló: \(createStatus)")
             return
         }
-        self.session = sess
-        print("[DecodificadorH264] iniciado \(ancho)×\(alto) @\(fps)fps")
+        session = sess
+        let dims = CMVideoFormatDescriptionGetDimensions(desc)
+        print("[DecodificadorH264] sesión creada \(dims.width)×\(dims.height)")
     }
 
-    /// Recibe un frame tal cual lo envía el servidor: [tipo: UInt8] + [NAL units].
-    /// - Tipo 1 = keyframe (IDR), tipo 0 = delta (P/B frame).
-    func decodificar(datos: Data) {
-        guard let session, datos.count > 1 else { return }
-
-        _ = datos[0]  // tipo: 1=keyframe, 0=delta
-        let nalData = datos.subdata(in: 1..<datos.count)
-
-        var blockBuffer: CMBlockBuffer?
-        let bbStatus = nalData.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
-            CMBlockBufferCreateWithMemoryBlock(
-                allocator: kCFAllocatorDefault,
-                memoryBlock: nil,
-                blockLength: nalData.count,
-                blockAllocator: kCFAllocatorDefault,
-                customBlockSource: nil,
-                offsetToData: 0,
-                dataLength: nalData.count,
-                flags: 0,
-                blockBufferOut: &blockBuffer
-            )
+    /// Trocea Annex B en NAL units. Acepta start codes de 3 y 4 bytes (ffmpeg
+    /// mezcla ambos: 4 para SPS/keyframes, 3 para el resto). Pariente de la
+    /// trampa del servidor: al encontrar el delimitador se salta ENTERO antes
+    /// de seguir, o se encuentra a sí mismo.
+    private func separarNALs(_ datos: Data) -> [Data] {
+        let bytes = [UInt8](datos)
+        var nals: [Data] = []
+        var inicio = -1
+        var i = 0
+        while i + 2 < bytes.count {
+            if bytes[i] == 0, bytes[i + 1] == 0, bytes[i + 2] == 1 {
+                if inicio >= 0 {
+                    var fin = i
+                    // Start code de 4 bytes: el 00 previo es del delimitador.
+                    if fin > inicio, bytes[fin - 1] == 0 { fin -= 1 }
+                    if fin > inicio { nals.append(Data(bytes[inicio..<fin])) }
+                }
+                i += 3
+                inicio = i
+            } else {
+                i += 1
+            }
         }
-        guard bbStatus == noErr, let bb = blockBuffer else { return }
-
-        CMBlockBufferReplaceDataBytes(
-            with: nalData.withUnsafeBytes { $0.baseAddress! },
-            blockBuffer: bb,
-            offsetIntoDestination: 0,
-            dataLength: nalData.count
-        )
-
-        var sampleBuffer: CMSampleBuffer?
-        var timing = CMSampleTimingInfo(
-            duration: CMTime.invalid,
-            presentationTimeStamp: CMClockGetTime(CMClockGetHostTimeClock()),
-            decodeTimeStamp: .invalid
-        )
-        let sbStatus = CMSampleBufferCreateReady(
-            allocator: kCFAllocatorDefault,
-            dataBuffer: bb,
-            formatDescription: formatoDesc,
-            sampleCount: 1,
-            sampleTimingEntryCount: 1,
-            sampleTimingArray: &timing,
-            sampleSizeEntryCount: 0,
-            sampleSizeArray: nil,
-            sampleBufferOut: &sampleBuffer
-        )
-        guard sbStatus == noErr, let sb = sampleBuffer else { return }
-
-        let flags: VTDecodeFrameFlags = [
-            ._EnableAsynchronousDecompression,
-            ._EnableTemporalProcessing,
-        ]
-
-        VTDecompressionSessionDecodeFrame(
-            session,
-            sampleBuffer: sb,
-            flags: flags,
-            frameRefcon: nil,
-            infoFlagsOut: nil
-        )
+        if inicio >= 0, inicio < bytes.count {
+            nals.append(Data(bytes[inicio...]))
+        }
+        return nals
     }
 
     func detener() {
@@ -142,6 +213,8 @@ final class DecodificadorH264 {
         }
         formatoDesc = nil
         callback = nil
+        sps = nil
+        pps = nil
     }
 }
 
@@ -184,9 +257,22 @@ private func decodificadorCallback(
         sampleTiming: &timing,
         sampleBufferOut: &sampleBuffer
     )
-    if let sb = sampleBuffer {
-        DispatchQueue.main.async {
-            decodificador.callback?(sb)
-        }
+    guard let sb = sampleBuffer else { return }
+
+    // El layer no tiene timebase configurado, así que los PTS de reloj de
+    // host no se proyectan a nada: sin esta marca puede no pintar JAMÁS
+    // (tercera causa de pantalla negra, tan silenciosa como las otras dos).
+    if let attachments = CMSampleBufferGetSampleAttachmentsArray(sb, createIfNecessary: true),
+       CFArrayGetCount(attachments) > 0 {
+        let dict = unsafeBitCast(CFArrayGetValueAtIndex(attachments, 0), to: CFMutableDictionary.self)
+        CFDictionarySetValue(
+            dict,
+            Unmanaged.passUnretained(kCMSampleAttachmentKey_DisplayImmediately).toOpaque(),
+            Unmanaged.passUnretained(kCFBooleanTrue).toOpaque()
+        )
+    }
+
+    DispatchQueue.main.async {
+        decodificador.callback?(sb)
     }
 }
