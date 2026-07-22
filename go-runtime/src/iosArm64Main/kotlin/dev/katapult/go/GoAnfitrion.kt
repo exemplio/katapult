@@ -2,6 +2,8 @@ package dev.katapult.go
 
 import app.cash.zipline.loader.ManifestVerifier.Companion.NO_SIGNATURE_CHECKS
 import app.cash.zipline.loader.ZiplineLoader
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.darwin.Darwin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
@@ -30,7 +32,12 @@ class GoAnfitrion {
             manifestVerifier = NO_SIGNATURE_CHECKS,
             urlSession = NSURLSession.sharedSession,
         )
-        trabajo = arrancarGo(scope, dispatcher, loader, manifestUrl, control) { estado ->
+        trabajo = arrancarGo(
+            scope, dispatcher, loader, manifestUrl, control,
+            // La red del anfitrión: URLSession vía Ktor/Darwin. Con esto la
+            // lógica puede llamar a la API real del proyecto desde QuickJS.
+            red = RedGoKtor(HttpClient(Darwin)),
+        ) { estado ->
             when (estado) {
                 is GoEstado.Esperando -> alCambiar(GoInforme(null, 0, estado.detalle))
                 is GoEstado.Corriendo -> alCambiar(GoInforme(estado.pantalla, estado.version, null))

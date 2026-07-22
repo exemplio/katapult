@@ -50,12 +50,16 @@ kotlin {
             dependsOn(commonMain.get())
             dependencies {
                 implementation("app.cash.zipline:zipline-loader:1.27.0")
+                // RedGoKtor: el anfitrión hace las peticiones HTTP de la lógica
+                // (QuickJS no tiene red). El engine lo pone cada plataforma.
+                implementation("io.ktor:ktor-client-core:3.4.3")
             }
         }
         jvmMain {
             dependsOn(hostMain)
             dependencies {
                 implementation("com.squareup.okhttp3:okhttp:5.1.0")
+                implementation("io.ktor:ktor-client-okhttp:3.4.3")
                 // Anuncio mDNS + QR (Anuncio.kt). Arrastra las deps de Compose
                 // del espejo, que aquí sobran pero no estorban.
                 implementation(project(":mirror-runtime"))
@@ -68,6 +72,9 @@ kotlin {
         // template por defecto (el warning de Gradle sobre esto es esperado).
         val iosArm64Main by getting {
             dependsOn(hostMain)
+            dependencies {
+                implementation("io.ktor:ktor-client-darwin:3.4.3")
+            }
         }
     }
 }
@@ -93,8 +100,21 @@ tasks.register<JavaExec>("goHost") {
     dependsOn(jvmCompilation.compileTaskProvider)
     mainClass.set("dev.katapult.go.HostKt")
     classpath(jvmCompilation.output.allOutputs, project.provider { jvmCompilation.runtimeDependencyFiles })
+    // Interactivo: los eventos de la lógica se mandan escribiendo `id valor`.
+    standardInput = System.`in`
     // -PgoManifest=http://… para apuntar a otro servidor (p. ej. el del demo).
     providers.gradleProperty("goManifest").orNull?.let { args(it) }
+}
+
+// Vuelca el classpath del host a un archivo, para poder lanzarlo con `java`
+// a pelo (p. ej. en pruebas donde Gradle no reenvía el stdin del pipe).
+tasks.register("goHostClasspath") {
+    dependsOn(jvmCompilation.compileTaskProvider)
+    doLast {
+        val cp = (jvmCompilation.output.allOutputs + jvmCompilation.runtimeDependencyFiles!!)
+            .joinToString(File.pathSeparator) { it.absolutePath }
+        layout.buildDirectory.file("goHostCp.txt").get().asFile.writeText(cp)
+    }
 }
 
 // -PgoPort=8082 para cambiar el puerto (p. ej. para probar sin pisar el 8081).

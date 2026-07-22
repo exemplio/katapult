@@ -46,13 +46,19 @@ fun arrancarGo(
     loader: ZiplineLoader,
     manifestUrl: String,
     control: GoControl? = null,
+    /** Servicios de anfitrión: si se pasa, la lógica tiene red vía [SERVICIO_RED]. */
+    red: RedGo? = null,
     alCambiar: (GoEstado) -> Unit,
 ): Job = scope.launch(dispatcher + SupervisorJob()) {
     val resultados = loader.load(
         applicationName = "katapult-go",
         freshnessChecker = DefaultFreshnessCheckerNotFresh,
         manifestUrlFlow = repetir(manifestUrl, 500),
-    )
+    ) { zipline ->
+        // Los servicios del anfitrión se publican ANTES de que corra el main()
+        // de la lógica, para que pueda tomarlos en su init sin carreras.
+        red?.let { zipline.bind<RedGo>(SERVICIO_RED, it) }
+    }
 
     var version = 0
     var trabajoAnterior: Job? = null

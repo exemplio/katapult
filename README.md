@@ -129,9 +129,11 @@ Compose de verdad. Diseño y criterio de crecimiento en
       catálogo de 14 piezas con `Lienzo` incluido). Descubrimiento de
       servidores por mDNS + QR con deep links `katapult://`.
       Cronología: [docs/KATAPULT_GO_PASO_0.md](docs/KATAPULT_GO_PASO_0.md)
-- [ ] **Servicios de anfitrión** para la lógica Go — QuickJS no tiene red;
-      hasta que el anfitrión le preste `fetch`, la lógica no puede llamar a
-      una API real
+- [x] **Servicios de anfitrión: red** (`RedGo`) — el anfitrión hace las
+      peticiones HTTP por la lógica (QuickJS no tiene sockets): el modo Go
+      puede hablar con la API real del proyecto. El anfitrión de consola
+      (`goHost`) es interactivo: eventos por stdin, para probar flujos
+      completos desde Linux sin IPA
 - [ ] Decodificación nativa del espejo en la app (VideoToolbox) — hoy el modo
       espejo es un WKWebView del cliente web
 - [ ] Publicar los plugins en el portal de Gradle (ahora se resuelven por

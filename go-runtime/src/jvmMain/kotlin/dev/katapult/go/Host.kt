@@ -2,15 +2,25 @@ package dev.katapult.go
 
 import app.cash.zipline.loader.ManifestVerifier.Companion.NO_SIGNATURE_CHECKS
 import app.cash.zipline.loader.ZiplineLoader
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
 import java.util.concurrent.Executors
+import kotlin.concurrent.thread
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 
 /**
  * El anfitrión de consola: hace en Linux lo que katapult-go hace en el iPhone,
  * sin IPA de por medio. La lógica real está compartida en [arrancarGo]
- * (hostMain); aquí solo se pone el loader de OkHttp y el render en texto.
+ * (hostMain); aquí se ponen el loader de OkHttp, la red del anfitrión
+ * ([RedGoKtor]) y el render en texto.
+ *
+ * Es INTERACTIVO: escribe `id valor` (o solo `id`) y se envía como evento a la
+ * lógica — p. ej. `email ana@geapfit.xyz`, luego `password 12345678`, luego
+ * `entrar`. Sirve para probar de punta a punta flujos que llaman a la API real
+ * a través del puente de red, antes de compilar ningún IPA.
  */
 
 // 8081: el 8080 es del espejo. Ver el configureEach de ZiplineServeTask en el build.
@@ -31,20 +41,41 @@ fun main(args: Array<String>) {
         )
 
         println("Esperando lógica en $manifestUrl …")
-        println("(arranca `./gradlew :go-runtime:serveDevelopmentZipline --continuous` en otra terminal)\n")
+        println("(eventos por stdin: `id valor` — p. ej. `email ana@x.com`, `entrar`)\n")
 
-        arrancarGo(this, dispatcher, loader, manifestUrl) { estado ->
+        val control = GoControl()
+        arrancarGo(
+            scope = this,
+            dispatcher = dispatcher,
+            loader = loader,
+            manifestUrl = manifestUrl,
+            control = control,
+            red = RedGoKtor(HttpClient(OkHttp)),
+        ) { estado ->
             when (estado) {
                 is GoEstado.Esperando -> println("✗ sin lógica todavía: ${estado.detalle}")
                 is GoEstado.Corriendo -> render(estado.pantalla, estado.version)
+            }
+        }
+
+        // stdin → eventos. Hilo aparte porque readLine bloquea; el evento se
+        // encola DIRECTO al executor de Zipline (QuickJS es mono-hilo y
+        // control.evento no suspende: no hace falta corrutina de por medio).
+        thread(isDaemon = true, name = "stdin-eventos") {
+            while (true) {
+                val linea = readLine()?.trim() ?: break
+                if (linea.isEmpty()) continue
+                val id = linea.substringBefore(' ')
+                val valor = linea.substringAfter(' ', "").ifEmpty { null }
+                println("⇢ evento: $id ${valor ?: ""}")
+                executor.execute { control.evento(id, valor) }
             }
         }
         // El Job de arrancarGo es hijo de este runBlocking: se queda vivo aquí.
     }
 }
 
-// La consola es un anfitrión de solo lectura: pinta los elementos pero no
-// manda eventos. La interacción de verdad se prueba en katapult-go.
+// Aproximación en texto de cada pieza del catálogo, recursiva en contenedores.
 private fun render(pantalla: GoPantalla, version: Int) {
     val ancho = 64
     println("┌" + "─".repeat(ancho) + "┐")
