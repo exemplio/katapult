@@ -40,7 +40,11 @@ struct EspejoNativoView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
-                        .padding(.top, max(6, (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.safeAreaInsets.top ?? 0))
+                        // Sin sumar safeAreaInsets a mano: este VStack NO lleva
+                        // ignoresSafeArea (solo el video), así que SwiftUI ya lo
+                        // coloca bajo la barra de estado. Sumarlo lo bajaba el
+                        // doble y quedaba atravesado sobre el contenido.
+                        .padding(.top, 6)
                         .padding(.leading, 8)
                     Spacer()
                 }

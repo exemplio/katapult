@@ -21,7 +21,9 @@ final class SuperposicionTexto: UITextField, UITextFieldDelegate {
         borderStyle = .none
         backgroundColor = .clear
         textColor = .clear          // el texto real lo pinta Compose en el video
-        tintColor = .systemBlue     // el caret sí es nuestro
+        tintColor = .clear          // y el caret también: con dos carets (este y
+                                    // el de Compose) se veía el cursor doble, y
+                                    // el nativo ni siquiera se sincroniza
         autocorrectionType = .no
         autocapitalizationType = .none
         smartQuotesType = .no
