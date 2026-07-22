@@ -160,7 +160,7 @@ private struct RepresentableEspejo: UIViewRepresentable {
         }
 
         func conectar(url: URL) {
-            Task { await decodificador?.detener() }
+            decodificador?.detener()
             decodificador = nil
             websocket?.cancel()
             mostrados = 0
@@ -188,7 +188,7 @@ private struct RepresentableEspejo: UIViewRepresentable {
             websocket?.resume()
 
             Task {
-                await leerMensajes(decoder: decoder)
+                await leerMensajes()
             }
 
             estado.conectado = false
@@ -196,8 +196,8 @@ private struct RepresentableEspejo: UIViewRepresentable {
             estado.error = nil
         }
 
-        private func leerMensajes(decoder: DecodificadorH264) async {
-            guard let ws = websocket else { return }
+        private func leerMensajes() async {
+            guard let ws = websocket, let decoder = decodificador else { return }
 
             while true {
                 do {
@@ -209,14 +209,12 @@ private struct RepresentableEspejo: UIViewRepresentable {
                         if let texto = String(data: data, encoding: .utf8),
                            texto.hasPrefix("{") {
                             if let cfg = try? JSONDecoder().decode(ConfigEspejo.self, from: data) {
-                                await MainActor.run {
-                                    estado.modo = cfg.mode
-                                    estado.conectado = true
-                                    cfgAncho = cfg.width
-                                    cfgAlto = cfg.height
-                                    displayLayer?.frame = CGRect(x: 0, y: 0, width: CGFloat(cfg.width), height: CGFloat(cfg.height))
-                                }
-                                await decoder.iniciar(
+                                estado.modo = cfg.mode
+                                estado.conectado = true
+                                cfgAncho = cfg.width
+                                cfgAlto = cfg.height
+                                displayLayer?.frame = CGRect(x: 0, y: 0, width: CGFloat(cfg.width), height: CGFloat(cfg.height))
+                                decoder.iniciar(
                                     ancho: cfg.width, alto: cfg.height, fps: cfg.fps ?? 60
                                 ) { [weak self] buffer in
                                     self?.mostrarFrame(buffer)
@@ -224,18 +222,16 @@ private struct RepresentableEspejo: UIViewRepresentable {
                             }
                         } else {
                             // Frame H.264: [tipo] + [NAL units]
-                            await decoder.decodificar(datos: data)
+                            decoder.decodificar(datos: data)
                         }
                     case .string(let texto):
                         if let d = texto.data(using: .utf8),
                            let cfg = try? JSONDecoder().decode(ConfigEspejo.self, from: d) {
-                            await MainActor.run {
-                                estado.modo = cfg.mode
-                                estado.conectado = true
-                                cfgAncho = cfg.width
-                                cfgAlto = cfg.height
-                            }
-                            await decoder.iniciar(
+                            estado.modo = cfg.mode
+                            estado.conectado = true
+                            cfgAncho = cfg.width
+                            cfgAlto = cfg.height
+                            decoder.iniciar(
                                 ancho: cfg.width, alto: cfg.height, fps: cfg.fps ?? 60
                             ) { [weak self] buffer in
                                 self?.mostrarFrame(buffer)
@@ -246,11 +242,9 @@ private struct RepresentableEspejo: UIViewRepresentable {
                     }
 
                     // Reportar métricas cada segundo
-                    await reportarMetricas()
+                    reportarMetricas()
                 } catch {
-                    await MainActor.run {
-                        estado.error = "WebSocket: \(error.localizedDescription)"
-                    }
+                    estado.error = "WebSocket: \(error.localizedDescription)"
                     return
                 }
             }
