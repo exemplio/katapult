@@ -134,8 +134,8 @@ struct GoHostView: View {
                 tema = pantalla.tema
                 version = informe.version
                 detalle = nil
-                mostrarTitulo = pantalla.mostrarTitulo?.boolValue ?? true
-                mostrarFooter = pantalla.mostrarFooter?.boolValue ?? true
+                mostrarTitulo = pantalla.mostrarTitulo
+                mostrarFooter = pantalla.mostrarFooter
             } else {
                 detalle = informe.detalle
             }

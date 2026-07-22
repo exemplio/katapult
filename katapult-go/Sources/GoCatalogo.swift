@@ -113,8 +113,8 @@ struct ElementoView: View {
     private func textoView(_ texto: GoElementoTexto) -> some View {
         let libre = texto.libre
         if texto.marcado {
-            let base = (Text(texto.texto).foregroundStyle(colorTexto(texto)))
-                + Text(" *").foregroundStyle(.red).fontWeight(.bold)
+            let base = (Text(texto.texto).foregroundColor(colorTexto(texto)))
+                + Text(" *").foregroundColor(.red).fontWeight(.bold)
             base
                 .font(libre?.tamano.map { .system(size: CGFloat(truncating: $0)) } ?? fuente(de: texto.estilo))
                 .fontWeight(peso(libre?.peso))
