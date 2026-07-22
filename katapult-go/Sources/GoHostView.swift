@@ -18,6 +18,8 @@ struct GoHostView: View {
     @State private var version: Int32 = 0
     @State private var detalle: String?
     @State private var showMenu = false
+    @State private var mostrarTitulo = true
+    @State private var mostrarFooter = true
     // Lo que el usuario va tecleando en cada campo, por id. Es estado LOCAL:
     // así el TextField no pelea con los repintados que llegan de la lógica.
     @State private var borradores: [String: String] = [:]
@@ -43,8 +45,10 @@ struct GoHostView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text(titulo)
-                            .font(.title2.bold())
+                        if mostrarTitulo && !titulo.isEmpty {
+                            Text(titulo)
+                                .font(.title2.bold())
+                        }
 
                         // El catálogo v2: la lógica manda QUÉ mostrar como
                         // árbol de GoElemento; ElementoView (GoCatalogo.swift)
@@ -65,15 +69,17 @@ struct GoHostView: View {
                 // del área segura no se solapa nunca con el contenido, y con
                 // fondo .bar se lee sobre cualquier cosa.
                 .safeAreaInset(edge: .bottom) {
-                    Text("lógica v\(version) · \(manifestURL.absoluteString)")
-                        .font(.caption2.monospaced())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal)
-                        .padding(.vertical, 6)
-                        .background(.bar)
+                    if mostrarFooter {
+                        Text("lógica v\(version) · \(manifestURL.absoluteString)")
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal)
+                            .padding(.vertical, 6)
+                            .background(.bar)
+                    }
                 }
                 // Theming acotado (GoTema): fondo y acento de marca. Solo si
                 // la lógica lo manda; sin tema, el aspecto del sistema de siempre.
@@ -128,6 +134,8 @@ struct GoHostView: View {
                 tema = pantalla.tema
                 version = informe.version
                 detalle = nil
+                mostrarTitulo = pantalla.mostrarTitulo?.boolValue ?? true
+                mostrarFooter = pantalla.mostrarFooter?.boolValue ?? true
             } else {
                 detalle = informe.detalle
             }

@@ -33,6 +33,10 @@ data class GoPantalla(
     /** null = aspecto del sistema, como siempre. Apps viejas lo ignoran (el
      *  Json del puente lleva ignoreUnknownKeys): degradación sin roturas. */
     val tema: GoTema? = null,
+    /** false = oculta el título y la barra de navegación superior. */
+    val mostrarTitulo: Boolean = true,
+    /** true = muestra el footer de depuración (versión, URL). Solo en desarrollo. */
+    val mostrarFooter: Boolean = true,
 )
 
 /**

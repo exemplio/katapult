@@ -112,17 +112,26 @@ struct ElementoView: View {
     @ViewBuilder
     private func textoView(_ texto: GoElementoTexto) -> some View {
         let libre = texto.libre
-        let base = Text(texto.texto)
-            .font(libre?.tamano.map { .system(size: CGFloat(truncating: $0)) } ?? fuente(de: texto.estilo))
-            .fontWeight(peso(libre?.peso))
-            .kerning(libre?.espaciado.map { CGFloat(truncating: $0) } ?? 0)
-            .foregroundStyle(colorTexto(texto))
-        if let alineacion = libre?.alineacion {
+        if texto.marcado {
+            let base = (Text(texto.texto).foregroundStyle(colorTexto(texto)))
+                + Text(" *").foregroundStyle(.red).fontWeight(.bold)
             base
-                .multilineTextAlignment(alineacionTexto(alineacion))
-                .frame(maxWidth: .infinity, alignment: marcoTexto(alineacion))
+                .font(libre?.tamano.map { .system(size: CGFloat(truncating: $0)) } ?? fuente(de: texto.estilo))
+                .fontWeight(peso(libre?.peso))
+                .kerning(libre?.espaciado.map { CGFloat(truncating: $0) } ?? 0)
         } else {
-            base
+            let base = Text(texto.texto)
+                .font(libre?.tamano.map { .system(size: CGFloat(truncating: $0)) } ?? fuente(de: texto.estilo))
+                .fontWeight(peso(libre?.peso))
+                .kerning(libre?.espaciado.map { CGFloat(truncating: $0) } ?? 0)
+                .foregroundStyle(colorTexto(texto))
+            if let alineacion = libre?.alineacion {
+                base
+                    .multilineTextAlignment(alineacionTexto(alineacion))
+                    .frame(maxWidth: .infinity, alignment: marcoTexto(alineacion))
+            } else {
+                base
+            }
         }
     }
 
@@ -291,11 +300,14 @@ struct ElementoView: View {
     }
 
     /// "texto normal *enlace*" tocable; el enlace hereda el tinte del tema.
+    /// Si [monocromo] es true, la parte activa va en negrita sin color de acento
+    /// — modo producción, más sobrio.
     @ViewBuilder
     private func enlaceView(_ e: GoElementoEnlace) -> some View {
+        let colorEnlace: Color = e.monocromo ? .primary : .accentColor
         Button { enviar(e.id, nil) } label: {
             (Text(e.texto.isEmpty ? "" : e.texto + " ").foregroundColor(.secondary)
-                + Text(e.enlace).fontWeight(.bold).foregroundColor(.accentColor))
+                + Text(e.enlace).fontWeight(.bold).foregroundColor(colorEnlace))
                 .font(.subheadline)
         }
         .buttonStyle(.plain)
@@ -312,14 +324,28 @@ struct ElementoView: View {
                 enviar(campo.id, nuevo)
             }
         )
-        Group {
-            if campo.seguro {
-                SecureField(campo.pista, text: enlace)
-            } else {
-                TextField(campo.pista, text: enlace)
-                    .keyboardType(teclado(de: campo.teclado))
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+        HStack(spacing: 8) {
+            Group {
+                if campo.seguro {
+                    SecureField(campo.pista, text: enlace)
+                } else {
+                    TextField(campo.pista, text: enlace)
+                        .keyboardType(teclado(de: campo.teclado))
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+            }
+            if let icono = campo.adornoDerecha {
+                Button {
+                    if let idAdorno = campo.idAdorno {
+                        enviar(idAdorno, nil)
+                    }
+                } label: {
+                    Image(systemName: icono)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(14)

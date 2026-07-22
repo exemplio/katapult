@@ -27,6 +27,9 @@ sealed interface GoElemento {
         val estilo: EstiloTexto = EstiloTexto.CUERPO,
         /** Estilo libre acotado (jul 2026): anula al semántico si se da. */
         val libre: EstiloLibre? = null,
+        /** Etiqueta de formulario con * rojo: Texto("Correo electrónico", marcado = true)
+         *  pinta "Correo electrónico" + " *" en color de aviso. */
+        val marcado: Boolean = false,
     ) : GoElemento
 
     @Serializable
@@ -63,6 +66,10 @@ sealed interface GoElemento {
         /** Color del borde en hex; null = separator del sistema. */
         val borde: String? = null,
         val grosorBorde: Double? = null,
+        /** Nombre de SF Symbol a la derecha (ej. "eye", "eye.slash"); null = sin adorno. */
+        val adornoDerecha: String? = null,
+        /** ID del evento al tocar el adorno; null = solo decoración. */
+        val idAdorno: String? = null,
     ) : GoElemento
 
     /**
@@ -82,6 +89,8 @@ sealed interface GoElemento {
         /** true = alineado al final (derecha); false = centrado. */
         val alFinal: Boolean = false,
         val habilitado: Boolean = true,
+        /** true = solo negrita, sin color de acento. Modo producción. */
+        val monocromo: Boolean = false,
     ) : GoElemento
 
     /** Manda "true"/"false" como valor del evento. */
