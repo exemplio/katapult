@@ -30,6 +30,25 @@ interface GoLogica : ZiplineService {
 data class GoPantalla(
     val titulo: String,
     val elementos: List<GoElemento>,
+    /** null = aspecto del sistema, como siempre. Apps viejas lo ignoran (el
+     *  Json del puente lleva ignoreUnknownKeys): degradación sin roturas. */
+    val tema: GoTema? = null,
+)
+
+/**
+ * Theming ACOTADO del catálogo: tres perillas de marca y ni una más. La línea
+ * roja de siempre aplica — esto NO es un sistema de estilos por elemento (esa
+ * es la trampa Redwood); es el mínimo para que el wireframe sea "de tu app"
+ * en vez de genérico. Colores en hex "#RRGGBB".
+ */
+@Serializable
+data class GoTema(
+    /** Fondo de toda la pantalla. */
+    val fondo: String? = null,
+    /** Tinte de acento: botones prominentes, interruptores, progreso. */
+    val acento: String? = null,
+    /** true fuerza apariencia clara, false oscura; null respeta el sistema. */
+    val claro: Boolean? = null,
 )
 
 // El catálogo de elementos vive en GoElemento.kt (archivo aparte a propósito:

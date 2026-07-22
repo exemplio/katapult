@@ -97,7 +97,9 @@ katapultGo {
 Los límites son deliberados: el catálogo es fijo (Apple prohíbe descargar
 código nativo, así que las piezas nuevas requieren IPA), y no hay `Modifier`
 arbitrario ni animaciones libres — para eso está el espejo, que ejecuta
-Compose de verdad. Diseño y criterio de crecimiento en
+Compose de verdad. Lo único de estilo que viaja es `GoTema` (fondo, acento y
+claro/oscuro): tres perillas de marca para que el wireframe sea "de tu app",
+no un sistema de estilos. Diseño y criterio de crecimiento en
 [docs/CATALOGO_GO_PROPUESTA.md](docs/CATALOGO_GO_PROPUESTA.md).
 
 ## Requisitos

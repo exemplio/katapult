@@ -14,6 +14,7 @@ struct GoHostView: View {
 
     @State private var titulo = ""
     @State private var elementos: [GoElemento] = []
+    @State private var tema: GoTema?
     @State private var version: Int32 = 0
     @State private var detalle: String?
     @State private var showMenu = false
@@ -74,8 +75,18 @@ struct GoHostView: View {
                         .padding(.vertical, 6)
                         .background(.bar)
                 }
+                // Theming acotado (GoTema): fondo y acento de marca. Solo si
+                // la lógica lo manda; sin tema, el aspecto del sistema de siempre.
+                .background {
+                    if let fondo = tema?.fondo {
+                        colorGo(fondo).ignoresSafeArea()
+                    }
+                }
+                .tint((tema?.acento).map(colorGo))
             }
         }
+        // Fuera del if: también la pantalla de espera respeta claro/oscuro.
+        .preferredColorScheme(esquemaForzado)
         .onAppear(perform: arrancar)
         .onDisappear { anfitrion.detener() }
         // Agitar abre el menú, igual que en el modo espejo.
@@ -97,6 +108,12 @@ struct GoHostView: View {
         }
     }
 
+    /// GoTema.claro: true fuerza claro, false oscuro, null (sin tema) sistema.
+    private var esquemaForzado: ColorScheme? {
+        guard let claro = tema?.claro else { return nil }
+        return claro.boolValue ? .light : .dark
+    }
+
     private func arrancar() {
         anfitrion.detener()
         version = 0
@@ -108,6 +125,7 @@ struct GoHostView: View {
             if let pantalla = informe.pantalla {
                 titulo = pantalla.titulo
                 elementos = pantalla.elementos as? [GoElemento] ?? []
+                tema = pantalla.tema
                 version = informe.version
                 detalle = nil
             } else {

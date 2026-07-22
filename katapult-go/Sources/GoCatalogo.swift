@@ -222,9 +222,9 @@ struct LienzoView: View {
             )
             let ruta = Path(roundedRect: rect, cornerRadius: CGFloat(r.esquinas))
             if r.relleno {
-                ctx.fill(ruta, with: .color(color(r.color)))
+                ctx.fill(ruta, with: .color(colorGo(r.color)))
             } else {
-                ctx.stroke(ruta, with: .color(color(r.color)), lineWidth: 1)
+                ctx.stroke(ruta, with: .color(colorGo(r.color)), lineWidth: 1)
             }
 
         } else if let c = orden as? OrdenDibujoCirculo {
@@ -235,9 +235,9 @@ struct LienzoView: View {
             )
             let ruta = Path(ellipseIn: rect)
             if c.relleno {
-                ctx.fill(ruta, with: .color(color(c.color)))
+                ctx.fill(ruta, with: .color(colorGo(c.color)))
             } else {
-                ctx.stroke(ruta, with: .color(color(c.color)), lineWidth: 1)
+                ctx.stroke(ruta, with: .color(colorGo(c.color)), lineWidth: 1)
             }
 
         } else if let l = orden as? OrdenDibujoLinea {
@@ -248,28 +248,30 @@ struct LienzoView: View {
             var ruta = Path()
             ruta.move(to: puntos[0])
             for p in puntos.dropFirst() { ruta.addLine(to: p) }
-            ctx.stroke(ruta, with: .color(color(l.color)), lineWidth: CGFloat(l.grosor))
+            ctx.stroke(ruta, with: .color(colorGo(l.color)), lineWidth: CGFloat(l.grosor))
 
         } else if let t = orden as? OrdenDibujoRotulo {
             let texto = Text(t.texto)
                 .font(.system(size: CGFloat(t.tamano)))
-                .foregroundColor(color(t.color))
+                .foregroundColor(colorGo(t.color))
             ctx.draw(texto, at: CGPoint(x: t.x * tamano.width, y: t.y * tamano.height))
         }
     }
 
-    /// "#RRGGBB" o "#RRGGBBAA" → Color. Un hex roto se pinta gris, no revienta.
-    private func color(_ hex: String) -> Color {
-        var s = hex.trimmingCharacters(in: .whitespaces)
-        if s.hasPrefix("#") { s.removeFirst() }
-        guard s.count == 6 || s.count == 8, let v = UInt64(s, radix: 16) else {
-            return .gray
-        }
-        let tieneAlfa = s.count == 8
-        let r = Double((v >> (tieneAlfa ? 24 : 16)) & 0xFF) / 255
-        let g = Double((v >> (tieneAlfa ? 16 : 8)) & 0xFF) / 255
-        let b = Double((v >> (tieneAlfa ? 8 : 0)) & 0xFF) / 255
-        let a = tieneAlfa ? Double(v & 0xFF) / 255 : 1
-        return Color(red: r, green: g, blue: b, opacity: a)
+}
+
+/// "#RRGGBB" o "#RRGGBBAA" → Color. Un hex roto se pinta gris, no revienta.
+/// A nivel de archivo porque lo usan el Lienzo y el theming (GoTema).
+func colorGo(_ hex: String) -> Color {
+    var s = hex.trimmingCharacters(in: .whitespaces)
+    if s.hasPrefix("#") { s.removeFirst() }
+    guard s.count == 6 || s.count == 8, let v = UInt64(s, radix: 16) else {
+        return .gray
     }
+    let tieneAlfa = s.count == 8
+    let r = Double((v >> (tieneAlfa ? 24 : 16)) & 0xFF) / 255
+    let g = Double((v >> (tieneAlfa ? 16 : 8)) & 0xFF) / 255
+    let b = Double((v >> (tieneAlfa ? 8 : 0)) & 0xFF) / 255
+    let a = tieneAlfa ? Double(v & 0xFF) / 255 : 1
+    return Color(red: r, green: g, blue: b, opacity: a)
 }
