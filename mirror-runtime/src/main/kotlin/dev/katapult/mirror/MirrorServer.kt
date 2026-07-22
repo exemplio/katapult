@@ -26,9 +26,35 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.jetbrains.skia.Bitmap
 
-/** Evento de toque que llega desde el cliente, en coordenadas de píxel. */
+/**
+ * Mensaje del cliente. `type` decide qué campos aplican:
+ *  - "down"/"move"/"up": toque en (x, y) píxeles de la escena.
+ *  - "cliente": el cliente se presenta (nativo=true activa los mensajes de foco;
+ *    el cliente web no se presenta y así no recibe texto que no entiende).
+ *  - "texto": el teclado nativo escribió; `valor` es el contenido COMPLETO.
+ *  - "ime": el usuario pulsó la acción del teclado (Done/Next…).
+ */
 @Serializable
-data class TouchEvent(val type: String, val x: Float, val y: Float)
+data class TouchEvent(
+    val type: String,
+    val x: Float = 0f,
+    val y: Float = 0f,
+    val valor: String? = null,
+)
+
+/** Mensaje de foco al cliente nativo: dónde y cómo superponer su UITextField. */
+@Serializable
+private data class FocoMensaje(
+    val type: String = "foco",
+    val valor: String,
+    val teclado: String,
+    val accion: String,
+    val seguro: Boolean,
+    val x: Int,
+    val y: Int,
+    val w: Int,
+    val h: Int,
+)
 
 /** Un frame ya codificado, listo para mandar. */
 private class VideoFrame(val bytes: ByteArray, val isKeyframe: Boolean)
@@ -101,6 +127,17 @@ class MirrorServer(
     private lateinit var renderer: Renderer
     private val perf = Perf()
 
+    // Mensajes de foco de texto hacia los clientes nativos. replay=1: el que
+    // se conecta (o se presenta) con un campo ya enfocado recibe el estado.
+    private val focoMensajes = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 8)
+
+    /** Último JSON de foco emitido; evita repetir mensajes idénticos por frame. */
+    private var ultimoFocoJson: String? = null
+
+    // encodeDefaults: sin él, kotlinx omite `type: "foco"` (valor por defecto)
+    // y el cliente, que enruta por ese campo, ignoraría el mensaje.
+    private val jsonFoco = Json { encodeDefaults = true }
+
     /** H.264 si hay ffmpeg; si no, JPEG, que siempre funciona pero pesa 40x más. */
     private val useH264 = H264Encoder.isAvailable()
     private var encoder: H264Encoder? = null
@@ -131,6 +168,7 @@ class MirrorServer(
                 val bitmap = renderer.snapshot()
                 perf.recordRender(renderer.lastRenderNanos, renderer.lastCopyNanos)
                 snapshots.send(bitmap)
+                vigilarFoco()
                 // Descontar lo ya gastado; si nos pasamos del periodo, no dormimos.
                 val spentMs = (System.nanoTime() - loopStart) / 1_000_000
                 delay((framePeriod - spentMs).coerceAtLeast(0))
@@ -189,13 +227,28 @@ class MirrorServer(
                     // Primero, cómo interpretar lo que viene después.
                     send(Frame.Text(hello()))
 
-                    // Los toques del cliente se inyectan en la escena (en el EDT).
+                    // Solo los clientes que se PRESENTAN como nativos reciben
+                    // mensajes de foco: el cliente web hace JSON.parse de todo
+                    // texto como si fuera la config y se rompería.
+                    var nativo = false
+                    val focoJob = launch {
+                        focoMensajes.collect { if (nativo) send(Frame.Text(it)) }
+                    }
+
+                    // Mensajes del cliente: toques, texto del teclado nativo, IME.
                     val incoming = launch {
                         for (frame in this@webSocket.incoming) {
                             if (frame !is Frame.Text) continue
                             val ev = runCatching { Json.decodeFromString<TouchEvent>(frame.readText()) }
                                 .getOrNull() ?: continue
-                            withContext(Dispatchers.Main) { sendTouch(ev) }
+                            when (ev.type) {
+                                "cliente" -> nativo = true
+                                "texto" -> withContext(Dispatchers.Main) {
+                                    renderer.escribirTexto(ev.valor.orEmpty())
+                                }
+                                "ime" -> withContext(Dispatchers.Main) { renderer.accionIme() }
+                                else -> withContext(Dispatchers.Main) { sendTouch(ev) }
+                            }
                         }
                     }
 
@@ -212,6 +265,7 @@ class MirrorServer(
                         send(Frame.Binary(true, withHeader(frame.bytes, frame.isKeyframe)))
                     }
                     incoming.cancel()
+                    focoJob.cancel()
                 }
             }
         }.start(wait = false)
@@ -236,6 +290,35 @@ class MirrorServer(
             it[0] = if (isKeyframe) 1 else 0
             bytes.copyInto(it, destinationOffset = 1)
         }
+
+    /**
+     * Vigila el foco de texto una vez por frame (en el EDT) y emite el cambio.
+     * Comparar el JSON evita repetir mensajes idénticos; los rects van en Int
+     * para que el jitter subpíxel del layout no meta ruido.
+     */
+    private fun vigilarFoco() {
+        val foco = renderer.focoInfo()
+        val json = foco?.let {
+            val r = it.rect
+            jsonFoco.encodeToString(
+                FocoMensaje.serializer(),
+                FocoMensaje(
+                    valor = it.valor,
+                    teclado = it.teclado,
+                    accion = it.accionIme,
+                    seguro = it.seguro,
+                    x = r?.left?.toInt() ?: 0,
+                    y = r?.top?.toInt() ?: 0,
+                    w = r?.width?.toInt() ?: 0,
+                    h = r?.height?.toInt() ?: 0,
+                ),
+            )
+        }
+        if (json != ultimoFocoJson) {
+            ultimoFocoJson = json
+            focoMensajes.tryEmit(json ?: """{"type":"blur"}""")
+        }
+    }
 
     /** Debe llamarse en el EDT. */
     private fun sendTouch(ev: TouchEvent) {

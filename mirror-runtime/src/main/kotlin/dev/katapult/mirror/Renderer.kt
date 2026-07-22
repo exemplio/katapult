@@ -1,31 +1,51 @@
+// La escena de bajo nivel y el interceptor de IME son APIs internas/experimentales
+// de compose-ui: el precio de poder inyectar un PlatformContext propio. Fijadas a
+// la versión exacta de CMP del proyecto (ver la nota de versiones en el build).
+@file:OptIn(InternalComposeUiApi::class, ExperimentalComposeUiApi::class)
+
 package dev.katapult.mirror
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.asComposeCanvas
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.ui.platform.PlatformContext
+import androidx.compose.ui.platform.PlatformTextInputMethodRequest
+import androidx.compose.ui.scene.CanvasLayersComposeScene
 import androidx.compose.ui.scene.ComposeScenePointer
+import androidx.compose.ui.text.input.CommitTextCommand
+import androidx.compose.ui.text.input.DeleteSurroundingTextCommand
+import androidx.compose.ui.text.input.EditCommand
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.ImeOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PlatformTextInputService
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.awaitCancellation
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
 import org.jetbrains.skia.ImageInfo
+import org.jetbrains.skia.Surface
 
 /**
  * LifecycleOwner mínimo para la escena.
  *
  * Sin esto, `collectAsStateWithLifecycle` (que espera el estado STARTED) nunca
  * empieza a recolectar y la app se queda en su pantalla vacía, SIN dar error.
- * Una ventana de Compose Desktop provee uno; ImageComposeScene no.
+ * Una ventana de Compose Desktop provee uno; la escena a pelo no.
  */
 private class MirrorLifecycleOwner : LifecycleOwner {
     private val registry = LifecycleRegistry(this)
@@ -38,11 +58,39 @@ private class MirrorLifecycleOwner : LifecycleOwner {
 }
 
 /**
+ * El campo de texto enfocado en la escena, resumido para el protocolo del
+ * espejo: lo que el cliente nativo necesita para superponer su UITextField.
+ * [rect] va en píxeles de la escena (el cliente lo proyecta a su pantalla).
+ */
+data class FocoTexto(
+    val valor: String,
+    val teclado: String,
+    val accionIme: String,
+    val seguro: Boolean,
+    val rect: Rect?,
+)
+
+/**
+ * La sesión de entrada de texto activa, unificada: Compose tiene dos tuberías
+ * de IME (la nueva por PlatformTextInputMethodRequest y la legacy por
+ * PlatformTextInputService) y según la versión del widget dispara una u otra.
+ * Interceptamos AMBAS y las reducimos a esto.
+ */
+private class SesionTexto(
+    val valor: () -> TextFieldValue,
+    val imeOptions: ImeOptions,
+    val editar: (List<EditCommand>) -> Unit,
+    val accionIme: (ImeAction) -> Unit,
+    val rect: () -> Rect?,
+)
+
+/**
  * Renderiza una UI Compose fuera de pantalla y devuelve el frame codificado.
  *
- * Usa ImageComposeScene, que rasteriza con Skia sin ventana ni servidor X.
- * Es el mismo motor que Compose Multiplatform usa en iOS, así que lo que sale
- * aquí es prácticamente idéntico a lo que se vería en el dispositivo.
+ * Usa CanvasLayersComposeScene (la escena de bajo nivel de skiko) en vez de
+ * ImageComposeScene: mismo motor Skia, pero permite inyectar un
+ * [PlatformContext] propio — que es donde se intercepta el FOCO DE TEXTO para
+ * el teclado nativo del cliente iOS (Fase 2 del espejo nativo).
  *
  * OJO: width/height van en PÍXELES, no en dp. La densidad solo convierte dp→px
  * dentro de la composición. Para simular un iPhone de 390x844 dp @2x hay que
@@ -59,20 +107,136 @@ class Renderer(
 
     private val lifecycleOwner = MirrorLifecycleOwner()
 
-    private val scene = ImageComposeScene(
-        width = widthPx,
-        height = heightPx,
-        density = Density(density),
-    ) {
-        CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
-            content()
+    /** Sesión de texto activa (null = ningún campo enfocado). Solo en el EDT. */
+    private var sesionTexto: SesionTexto? = null
+
+    // ——— Interceptores de las dos tuberías de IME ———
+
+    private val plataforma = object : PlatformContext by PlatformContext.Empty() {
+
+        // Tubería nueva (BasicTextField moderno): una corrutina por sesión de
+        // foco; se cancela al perderlo.
+        override suspend fun startInputMethod(request: PlatformTextInputMethodRequest): Nothing {
+            sesionTexto = SesionTexto(
+                valor = { request.value() },
+                imeOptions = request.imeOptions,
+                editar = { request.onEditCommand(it) },
+                accionIme = { request.onImeAction?.invoke(it) },
+                rect = { runCatching { request.textFieldRectInRoot() }.getOrNull() },
+            )
+            try {
+                awaitCancellation()
+            } finally {
+                sesionTexto = null
+            }
         }
+
+        // Tubería legacy (TextField basados en value/onValueChange antiguos).
+        @Suppress("OVERRIDE_DEPRECATION")
+        override val textInputService: PlatformTextInputService =
+            object : PlatformTextInputService {
+                private var valorActual: TextFieldValue = TextFieldValue()
+                private var rectActual: Rect? = null
+
+                override fun startInput(
+                    value: TextFieldValue,
+                    imeOptions: ImeOptions,
+                    onEditCommand: (List<EditCommand>) -> Unit,
+                    onImeActionPerformed: (ImeAction) -> Unit,
+                ) {
+                    valorActual = value
+                    sesionTexto = SesionTexto(
+                        valor = { valorActual },
+                        imeOptions = imeOptions,
+                        editar = onEditCommand,
+                        accionIme = onImeActionPerformed,
+                        rect = { rectActual },
+                    )
+                }
+
+                override fun stopInput() {
+                    sesionTexto = null
+                    rectActual = null
+                }
+
+                override fun showSoftwareKeyboard() {}
+                override fun hideSoftwareKeyboard() {}
+
+                override fun updateState(oldValue: TextFieldValue?, newValue: TextFieldValue) {
+                    valorActual = newValue
+                }
+
+                @Deprecated("Sustituido en la tubería nueva; aquí es la única fuente del rect")
+                override fun notifyFocusedRect(rect: Rect) {
+                    rectActual = rect
+                }
+            }
     }
 
+    @OptIn(InternalComposeUiApi::class)
+    private val scene = CanvasLayersComposeScene(
+        density = Density(density),
+        size = IntSize(widthPx, heightPx),
+        platformContext = plataforma,
+        invalidate = {}, // renderizamos a 60 fps igualmente; no hay que despertar a nadie
+    )
+
+    // La escena dibuja sobre esta superficie raster; snapshot() la lee.
+    private val surface = Surface.makeRasterN32Premul(widthPx, heightPx)
+
     init {
+        scene.setContent {
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                content()
+            }
+        }
         // Tras crear la composición: pasar a RESUMED destraba los efectos que
         // dependen del lifecycle (carga de datos, collectAsStateWithLifecycle…).
         lifecycleOwner.resume()
+    }
+
+    // ——— API de foco de texto para MirrorServer ———
+
+    /** Estado del campo enfocado, o null. Llamar en el EDT. */
+    fun focoInfo(): FocoTexto? = sesionTexto?.let { s ->
+        FocoTexto(
+            valor = s.valor().text,
+            teclado = when (s.imeOptions.keyboardType) {
+                KeyboardType.Email -> "email"
+                KeyboardType.Number, KeyboardType.NumberPassword -> "numero"
+                KeyboardType.Decimal -> "decimal"
+                KeyboardType.Phone -> "telefono"
+                KeyboardType.Uri -> "uri"
+                KeyboardType.Password -> "password"
+                else -> "texto"
+            },
+            accionIme = when (s.imeOptions.imeAction) {
+                ImeAction.Done -> "done"
+                ImeAction.Next -> "next"
+                ImeAction.Go -> "go"
+                ImeAction.Search -> "search"
+                ImeAction.Send -> "send"
+                else -> "default"
+            },
+            seguro = s.imeOptions.keyboardType == KeyboardType.Password ||
+                s.imeOptions.keyboardType == KeyboardType.NumberPassword,
+            rect = s.rect(),
+        )
+    }
+
+    /** Reemplaza el texto del campo enfocado por [texto]. Llamar en el EDT. */
+    fun escribirTexto(texto: String) {
+        val s = sesionTexto ?: return
+        val largo = s.valor().text.length
+        // Borrar alrededor del cursor cubre todo el campo (los comandos
+        // recortan a los límites) y el commit deja el cursor al final.
+        s.editar(listOf(DeleteSurroundingTextCommand(largo, largo), CommitTextCommand(texto, 1)))
+    }
+
+    /** Dispara la acción IME del campo enfocado (Done/Next/…). En el EDT. */
+    fun accionIme() {
+        val s = sesionTexto ?: return
+        s.accionIme(s.imeOptions.imeAction)
     }
 
     /**
@@ -124,20 +288,23 @@ class Renderer(
      * Rasteriza el estado actual y copia los píxeles a un bitmap propio.
      *
      * Debe llamarse en el EDT, como todo lo que toca la escena. La copia existe
-     * para poder codificar en OTRO hilo: la imagen que devuelve `render` apunta
-     * a la superficie de la escena, que el frame siguiente sobrescribe.
+     * para poder codificar en OTRO hilo: la superficie de render se sobrescribe
+     * en el frame siguiente.
      *
      * Medido: rasterizar ~2,5 ms, copiar ~1 ms. Codificar, en cambio, cuesta
      * ~15 ms — por eso se hace fuera de aquí.
      */
+    @OptIn(InternalComposeUiApi::class)
     fun snapshot(): Bitmap {
         val t0 = System.nanoTime()
-        val image = scene.render(t0 - startNanos)
+        scene.render(surface.canvas.asComposeCanvas(), t0 - startNanos)
         val t1 = System.nanoTime()
 
         val bitmap = Bitmap()
         bitmap.allocPixels(ImageInfo.makeN32Premul(widthPx, heightPx))
-        if (!image.readPixels(bitmap)) error("Skia no pudo leer los píxeles del frame")
+        surface.makeImageSnapshot().use { image ->
+            if (!image.readPixels(bitmap)) error("Skia no pudo leer los píxeles del frame")
+        }
         bitmap.setImmutable()   // requisito para makeFromBitmap sin copia extra
 
         lastRenderNanos = t1 - t0
@@ -145,10 +312,14 @@ class Renderer(
         return bitmap
     }
 
-    fun close() = scene.close()
+    @OptIn(InternalComposeUiApi::class)
+    fun close() {
+        scene.close()
+        surface.close()
+    }
 
     companion object {
-        /** Un solo dedo: el cliente web manda un único punto de contacto. */
+        /** Un solo dedo: el cliente manda un único punto de contacto. */
         private const val TOUCH_POINTER_ID = 1L
 
         /**
