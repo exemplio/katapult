@@ -110,6 +110,7 @@ private fun lineas(e: GoElemento, sangria: String): List<String> = when (e) {
     is GoElemento.Lienzo -> listOf("$sangria🎨 lienzo ${e.alto}pt · ${e.ordenes.size} órdenes")
     is GoElemento.Separador -> listOf("$sangria────────")
     is GoElemento.Espacio -> listOf("")
+    is GoElemento.Caja -> e.hijos.flatMap { lineas(it, sangria) } // estilos: solo en la app
     is GoElemento.Columna -> e.hijos.flatMap { lineas(it, sangria) }
     is GoElemento.Fila -> e.hijos.flatMap { lineas(it, sangria) } // en texto, apilada
     is GoElemento.Tarjeta -> e.hijos.flatMap { lineas(it, "$sangria▕ ") }

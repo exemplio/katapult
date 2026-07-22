@@ -70,7 +70,7 @@ compila el IPA nativo.
 El otro modo de la app **Katapult Go** (la misma que muestra el espejo). Tu
 lógica de Kotlin se compila a bytecode de QuickJS, viaja por WiFi y se ejecuta
 *en el dispositivo*; al guardar un archivo, el iPhone recarga solo, sin IPA de
-por medio. La pantalla se declara como un árbol de datos (`GoElemento`, 15
+por medio. La pantalla se declara como un árbol de datos (`GoElemento`, 16
 piezas: textos, botones, campos, imágenes, contenedores anidables, un `Lienzo`
 de órdenes de dibujo para gráficos custom…) que la app pinta con SwiftUI
 nativo — sin WebView.
@@ -95,11 +95,14 @@ katapultGo {
 ```
 
 Los límites son deliberados: el catálogo es fijo (Apple prohíbe descargar
-código nativo, así que las piezas nuevas requieren IPA), y no hay `Modifier`
+código nativo, así que las piezas nuevas requieren IPA) y no hay `Modifier`
 arbitrario ni animaciones libres — para eso está el espejo, que ejecuta
-Compose de verdad. Lo único de estilo que viaja es `GoTema` (fondo, acento y
-claro/oscuro): tres perillas de marca para que el wireframe sea "de tu app",
-no un sistema de estilos. Diseño y criterio de crecimiento en
+Compose de verdad. Lo que sí viaja es estilo **acotado, a la React Native**:
+`GoTema` (fondo/acento/claro), la `Caja` (contenedor con padding, fondo,
+esquinas y borde, como la `View` de RN) y `Texto` con estilo libre (tamaño,
+peso, color). Con eso un proyecto describe su sistema de diseño casi al píxel
+— el mismo mecanismo por el que cualquier app RN corre en Expo Go. Diseño y
+criterio de crecimiento en
 [docs/CATALOGO_GO_PROPUESTA.md](docs/CATALOGO_GO_PROPUESTA.md).
 
 ## Requisitos
@@ -128,7 +131,7 @@ no un sistema de estilos. Diseño y criterio de crecimiento en
 - [x] **Katapult Go** — probado en iPhone real, con sus dos modos: **Espejo**
       (cliente web en WKWebView) y **Go** (anfitrión Zipline vía
       `GoRuntime.framework`: lógica en el dispositivo, recarga en caliente,
-      catálogo de 15 piezas con `Lienzo` incluido). Descubrimiento de
+      catálogo de 16 piezas con `Lienzo` incluido). Descubrimiento de
       servidores por mDNS + QR con deep links `katapult://`.
       Cronología: [docs/KATAPULT_GO_PASO_0.md](docs/KATAPULT_GO_PASO_0.md)
 - [x] **Servicios de anfitrión: red** (`RedGo`) — el anfitrión hace las

@@ -25,6 +25,8 @@ sealed interface GoElemento {
     data class Texto(
         val texto: String,
         val estilo: EstiloTexto = EstiloTexto.CUERPO,
+        /** Estilo libre acotado (jul 2026): anula al semántico si se da. */
+        val libre: EstiloLibre? = null,
     ) : GoElemento
 
     @Serializable
@@ -155,7 +157,60 @@ sealed interface GoElemento {
         val id: String,
         val hijos: List<GoElemento>,
     ) : GoElemento
+
+    /**
+     * La jugada de React Native (jul 2026): contenedor con ESTILOS, como la
+     * `View` de RN. Con Caja + Tocable + Texto.libre, un proyecto describe su
+     * propio sistema de diseño casi al píxel sin que el catálogo sepa nada de
+     * él — igual que cualquier app RN se describe con View+Text+estilos.
+     *
+     * Disciplina anti-Redwood: el lenguaje de estilos es CERRADO (estas
+     * propiedades, tipo CSS reducido). Crece con muchísima resistencia; lo que
+     * NO crece nunca es el número de widgets semánticos.
+     * OJO: pieza nueva — apps anteriores no la deserializan; emitirla solo
+     * con el IPA que la soporta.
+     */
+    @Serializable
+    @SerialName("caja")
+    data class Caja(
+        val hijos: List<GoElemento>,
+        /** "columna" o "fila". */
+        val direccion: String = "columna",
+        val espaciado: Int = 0,
+        /** Padding interior uniforme, en puntos. */
+        val relleno: Int = 0,
+        /** Color de fondo en hex; null = transparente. */
+        val fondo: String? = null,
+        /** Radio de esquinas, en puntos. */
+        val esquinas: Double = 0.0,
+        /** Color del borde en hex; null = sin borde. */
+        val borde: String? = null,
+        val grosorBorde: Double = 1.0,
+        /** Eje transversal: "inicio" | "centro" | "fin". */
+        val alineacion: String = "inicio",
+        /** Tamaño fijo en puntos; null = el que pida el contenido. */
+        val ancho: Int? = null,
+        val alto: Int? = null,
+    ) : GoElemento
 }
+
+/**
+ * Subconjunto CERRADO de estilo de texto, al estilo de RN: suficiente para
+ * logotipos, etiquetas y jerarquías propias; jamás un sistema tipográfico.
+ */
+@Serializable
+data class EstiloLibre(
+    /** Puntos; null = el del estilo semántico. */
+    val tamano: Double? = null,
+    /** "normal" | "medio" | "seminegrita" | "negrita" | "negra". */
+    val peso: String? = null,
+    /** Hex "#RRGGBB". */
+    val color: String? = null,
+    /** Espaciado entre letras, en puntos. */
+    val espaciado: Double? = null,
+    /** "izquierda" | "centro" | "derecha" — ocupa el ancho y alinea dentro. */
+    val alineacion: String? = null,
+)
 
 /** Una orden de dibujo del [GoElemento.Lienzo]. Colores en hex "#RRGGBB" o "#RRGGBBAA". */
 @Serializable

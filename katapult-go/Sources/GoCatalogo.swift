@@ -18,9 +18,7 @@ struct ElementoView: View {
     var body: some View {
         // ——— Primitivas ———
         if let texto = elemento as? GoElementoTexto {
-            Text(texto.texto)
-                .font(fuente(de: texto.estilo))
-                .foregroundStyle(texto.estilo == EstiloTexto.pie ? .secondary : .primary)
+            textoView(texto)
 
         } else if let boton = elemento as? GoElementoBoton {
             botonView(boton)
@@ -84,6 +82,9 @@ struct ElementoView: View {
             .padding(10)
             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
 
+        } else if let caja = elemento as? GoElementoCaja {
+            cajaView(caja)
+
         } else if let tocable = elemento as? GoElementoTocable {
             Button {
                 enviar(tocable.id, nil)
@@ -105,6 +106,108 @@ struct ElementoView: View {
     }
 
     // MARK: - Piezas con detalle
+
+    /// Texto con estilo semántico o, si viaja `libre`, el subset cerrado tipo
+    /// RN (tamaño/peso/color/espaciado/alineación).
+    @ViewBuilder
+    private func textoView(_ texto: GoElementoTexto) -> some View {
+        let libre = texto.libre
+        let base = Text(texto.texto)
+            .font(libre?.tamano.map { .system(size: CGFloat(truncating: $0)) } ?? fuente(de: texto.estilo))
+            .fontWeight(peso(libre?.peso))
+            .kerning(libre?.espaciado.map { CGFloat(truncating: $0) } ?? 0)
+            .foregroundStyle(colorTexto(texto))
+        if let alineacion = libre?.alineacion {
+            base
+                .multilineTextAlignment(alineacionTexto(alineacion))
+                .frame(maxWidth: .infinity, alignment: marcoTexto(alineacion))
+        } else {
+            base
+        }
+    }
+
+    /// La View de RN: contenedor con estilos cerrados. Con Tocable alrededor,
+    /// cualquier proyecto se fabrica sus propios botones y tarjetas.
+    @ViewBuilder
+    private func cajaView(_ caja: GoElementoCaja) -> some View {
+        Group {
+            if caja.direccion == "fila" {
+                HStack(alignment: .center, spacing: CGFloat(caja.espaciado)) {
+                    hijosView(caja.hijos)
+                }
+            } else {
+                VStack(alignment: alineacionH(caja.alineacion), spacing: CGFloat(caja.espaciado)) {
+                    hijosView(caja.hijos)
+                }
+            }
+        }
+        .padding(CGFloat(caja.relleno))
+        .frame(
+            width: caja.ancho.map { CGFloat(truncating: $0) },
+            height: caja.alto.map { CGFloat(truncating: $0) }
+        )
+        // Como la View de RN, la Caja es de bloque: ocupa el ancho disponible.
+        .frame(maxWidth: .infinity, alignment: marcoCaja(caja.alineacion))
+        .background {
+            if let fondo = caja.fondo {
+                RoundedRectangle(cornerRadius: CGFloat(caja.esquinas)).fill(colorGo(fondo))
+            }
+        }
+        .overlay {
+            if let borde = caja.borde {
+                RoundedRectangle(cornerRadius: CGFloat(caja.esquinas))
+                    .strokeBorder(colorGo(borde), lineWidth: CGFloat(caja.grosorBorde))
+            }
+        }
+    }
+
+    private func colorTexto(_ texto: GoElementoTexto) -> Color {
+        if let hex = texto.libre?.color { return colorGo(hex) }
+        return texto.estilo == EstiloTexto.pie ? .secondary : .primary
+    }
+
+    private func peso(_ nombre: String?) -> Font.Weight? {
+        switch nombre {
+        case "medio": return .medium
+        case "seminegrita": return .semibold
+        case "negrita": return .bold
+        case "negra": return .black
+        case "normal": return .regular
+        default: return nil
+        }
+    }
+
+    private func alineacionH(_ nombre: String) -> HorizontalAlignment {
+        switch nombre {
+        case "centro": return .center
+        case "fin": return .trailing
+        default: return .leading
+        }
+    }
+
+    private func marcoCaja(_ nombre: String) -> Alignment {
+        switch nombre {
+        case "centro": return .center
+        case "fin": return .trailing
+        default: return .leading
+        }
+    }
+
+    private func alineacionTexto(_ nombre: String) -> TextAlignment {
+        switch nombre {
+        case "centro": return .center
+        case "derecha": return .trailing
+        default: return .leading
+        }
+    }
+
+    private func marcoTexto(_ nombre: String) -> Alignment {
+        switch nombre {
+        case "centro": return .center
+        case "derecha": return .trailing
+        default: return .leading
+        }
+    }
 
     @ViewBuilder
     private func hijosView(_ lista: [GoElemento], anchoIgual: Bool = false) -> some View {

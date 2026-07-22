@@ -134,14 +134,19 @@ Coste por frame en el EDT: render 2,0 ms + copia 0,7 ms + lectura 1,9 ms.
 ./scripts/actualizar-go.sh
 ```
 
-El catálogo de widgets del modo Go (15 piezas, contenedores anidables) vive en
+El catálogo de widgets del modo Go (16 piezas, contenedores anidables) vive en
 go-runtime/…/GoElemento.kt + katapult-go/Sources/GoCatalogo.swift; diseño y
 criterio de crecimiento en docs/CATALOGO_GO_PROPUESTA.md. Añadir una pieza =
 cambio de contrato: publishToMavenLocal + IPA nuevo, y los campos nuevos
 SIEMPRE con valor por defecto (hay apps viejas instaladas; el Json del puente
 de Zipline lleva ignoreUnknownKeys=true, así que los campos extra se ignoran).
-El theming acotado es `GoTema` (GoLogica.kt): fondo + acento + claro/oscuro,
-y NADA más — estilos por elemento serían la trampa Redwood.
+El theming acotado es `GoTema` (GoLogica.kt): fondo + acento + claro/oscuro.
+En julio de 2026 se adoptó además **la jugada de React Native**: `Caja`
+(contenedor con estilos, como la View de RN) + `Texto.libre` (EstiloLibre).
+Con eso cada proyecto describe su sistema de diseño casi al píxel sin que el
+catálogo sepa de él. La disciplina anti-Redwood cambió de lugar: lo que no
+crece son los WIDGETS SEMÁNTICOS; el lenguaje de estilos es cerrado (tipo CSS
+reducido) y crece con muchísima resistencia.
 
 ## Arquitectura del espejo
 
