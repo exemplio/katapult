@@ -38,11 +38,9 @@ struct RootView: View {
                     }
                 }
             case .espejo(let url):
-                AppHostView(url: url) {
+                EspejoNativoView(url: url) {
                     screen = .connect
                 }
-                // El webview ocupa toda la pantalla, incluida la zona bajo la barra.
-                .ignoresSafeArea(edges: .bottom)
             case .go(let url):
                 GoHostView(manifestURL: url) {
                     screen = .connect
